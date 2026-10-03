@@ -114,7 +114,7 @@ export default function SquadPage() {
               Squad <span className={isComplete ? "text-success" : "text-accent"}>{currentSquad.code}</span>
             </h2>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="text-right hidden sm:block">
               <p className="text-[10px] font-mono tracking-[0.2em] text-muted uppercase mb-1">Squad Status</p>
               <p className={`font-mono font-bold text-lg ${isComplete ? 'text-success' : 'text-white'}`}>
@@ -129,6 +129,14 @@ export default function SquadPage() {
             >
               MISSION FEED <ExternalLink size={14} />
             </Button>
+            {currentSquad.code && <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/join/${encodeURIComponent(currentSquad.code!)}?preview=1`)}
+              className="gap-2"
+            >
+              PREVIEW INVITE <ExternalLink size={14} />
+            </Button>}
           </div>
         </div>
 
