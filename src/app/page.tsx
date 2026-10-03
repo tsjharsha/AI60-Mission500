@@ -5,81 +5,151 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useEffect, useState, Suspense } from 'react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
+import { Button } from '@/components/ui/Button';
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
-  const { setReferralContext } = useAppStore();
+  const { setReferralContext, setMode } = useAppStore();
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const source = searchParams.get('source') || undefined;
     const squad = searchParams.get('squad') || undefined;
     const ref = searchParams.get('ref') || undefined;
+    const mode = searchParams.get('mode');
     
     if (source || squad || ref) {
       setReferralContext({ source, squadCode: squad, referrerId: ref });
     }
     
+    if (mode === 'sim') {
+      setMode('SIMULATION');
+    }
+    
     trackEvent('landing_view', { source, squad, ref });
-  }, [searchParams, setReferralContext]);
+  }, [searchParams, setReferralContext, setMode]);
 
-  if (!mounted) return null;
+  const handleStart = () => {
+    trackEvent('diagnostic_started');
+    setIsTransitioning(true);
+    setTimeout(() => {
+      router.push('/diagnostic');
+    }, 400); // 400ms transition mask
+  };
+
+  const builderCount = mounted ? Math.max(327, Number(localStorage.getItem('ai60_demo_builder_number')) || 327) : 327;
 
   return (
-    <div className="flex flex-col min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Background glowing orb */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-900/20 rounded-full blur-[120px] pointer-events-none" />
+    <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-background">
       
-      <main className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
-        <motion.div
+      {/* Background Cinematic Depth */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute w-[600px] h-[600px] bg-accent/20 rounded-full blur-[120px] mix-blend-screen opacity-50" />
+        <div className="absolute inset-0 bg-grid-pattern opacity-[0.15]" />
+      </div>
+
+      <motion.div 
+        className="relative z-10 max-w-4xl w-full px-6 flex flex-col items-center text-center mt-[-5vh]"
+        animate={{ y: isTransitioning ? -50 : 0, opacity: isTransitioning ? 0 : 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        {/* Mission Label */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8 px-4 py-1.5 rounded-full border border-border bg-muted-bg/50 backdrop-blur-md inline-flex items-center gap-3"
+        >
+          <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
+          <span className="font-mono text-[11px] uppercase tracking-widest text-muted">
+            AI60 <span className="mx-2 opacity-50">/</span> Mission 500
+          </span>
+        </motion.div>
+
+        {/* Main Headline */}
+        <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="text-center max-w-3xl mx-auto"
+          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="text-5xl md:text-7xl lg:text-[80px] font-bold tracking-tight mb-6 leading-[1.05]"
         >
-          <div className="mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-sm text-zinc-400">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            327 / 500 Builders Discovered
-          </div>
+          YOUR RÉSUMÉ HAS <br className="hidden md:block" />
+          <span className="text-gradient-accent glow-effect inline-block mt-2">A HIDDEN AI GAP.</span>
+        </motion.h1>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-gradient">
-            Your résumé has a hidden AI gap.
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-zinc-400 mb-10 max-w-2xl mx-auto font-light">
-            Find the AI project you should build before placements.
-          </p>
+        {/* Subtitle */}
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="text-lg md:text-xl text-muted mb-12 max-w-xl mx-auto font-light leading-relaxed"
+        >
+          Find the AI project your profile should have before placements.
+        </motion.p>
 
-          <div className="flex flex-col items-center gap-4">
-            <button
-              onClick={() => router.push('/diagnostic')}
-              className="glow-button group relative px-8 py-4 bg-white text-black rounded-full font-semibold text-lg hover:scale-105 transition-all duration-300"
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                Discover My Project DNA
-                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </span>
-            </button>
-            <p className="text-sm text-zinc-500">90 seconds. No AI experience required.</p>
+        {/* CTA Area */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.5, type: "spring", stiffness: 100 }}
+          className="flex flex-col items-center w-full"
+        >
+          <Button 
+            size="lg" 
+            onClick={handleStart}
+            className="w-full md:w-auto min-w-[320px] shadow-[0_0_40px_rgba(59,130,246,0.25)] group"
+          >
+            DISCOVER MY PROJECT DNA
+          </Button>
+
+          {/* Microcopy */}
+          <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] font-mono text-muted/80 tracking-wider">
+            <span>90 SECONDS</span>
+            <span className="opacity-30">•</span>
+            <span>PERSONALIZED</span>
+            <span className="opacity-30">•</span>
+            <span>NO AI EXPERIENCE REQUIRED</span>
           </div>
         </motion.div>
-      </main>
 
-      {/* Footer minimal */}
-      <footer className="py-6 text-center text-zinc-600 text-sm border-t border-white/5 relative z-10">
-        MISSION 500 &copy; 2026 NxtWave
-      </footer>
+      </motion.div>
+
+      {/* Mission Signal Bottom */}
+      <motion.div 
+        className="absolute bottom-12 left-0 right-0 flex justify-center z-10 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, delay: 0.8 }}
+      >
+        <div className="flex flex-col items-center">
+          <div className="font-mono text-2xl font-bold text-white tabular-nums flex items-center gap-2">
+            {builderCount} <span className="text-muted text-lg font-normal">/ 500</span>
+          </div>
+          <div className="font-mono text-[10px] tracking-[0.25em] text-accent mt-1.5 uppercase">
+            Builders Discovered
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Transition Mask */}
+      {isTransitioning && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="fixed inset-0 bg-background z-50 pointer-events-none"
+        />
+      )}
     </div>
   );
 }
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <HomeContent />
     </Suspense>
   );

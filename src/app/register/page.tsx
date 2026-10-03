@@ -1,12 +1,13 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useState, useEffect } from 'react';
-import { ShieldCheck, Mail, Phone, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Mail, Phone, Lock, ArrowRight, Fingerprint } from 'lucide-react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
 import { registerUser, createSquad, joinSquad } from '@/lib/supabase/services';
+import { Button } from '@/components/ui/Button';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,7 +16,9 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [revealPhase, setRevealPhase] = useState(0); // 0: Form, 1: Generating, 2: Reveal
 
   useEffect(() => {
     setMounted(true);
@@ -29,8 +32,9 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !phone) return;
-    
+    setError('');
     setIsSubmitting(true);
+    setRevealPhase(1); // Start scanning animation
     
     try {
       // 0. Preflight Squad Validation
@@ -40,22 +44,23 @@ export default function RegisterPage() {
           const squadData = await checkRes.json();
           
           if (!checkRes.ok || squadData.isValid === false) {
-            alert("That squad invite is no longer valid. Redirecting to start your own.");
+            setError("That squad invite is no longer valid.");
             setIsSubmitting(false);
-            router.push('/diagnostic');
+            setRevealPhase(0);
             return;
           }
           
           if (squadData.isFull) {
-            alert("That squad filled up while you were joining. Redirecting to start your own.");
+            setError("That squad filled up while you were joining.");
             setIsSubmitting(false);
-            router.push('/diagnostic');
+            setRevealPhase(0);
             return;
           }
         } catch (checkErr) {
           console.error("Squad preflight check failed", checkErr);
-          alert("Could not verify squad status due to a network error. Please try again.");
+          setError("Could not verify squad status due to a network error. Please try again.");
           setIsSubmitting(false);
+          setRevealPhase(0);
           return;
         }
       }
@@ -91,9 +96,9 @@ export default function RegisterPage() {
         );
         
         if (joinResult.error) {
-          // Join failed (e.g. squad full). Route to diagnostic to "start my own squad".
-          alert(`Could not join squad: ${joinResult.error}. Redirecting to start your own.`);
-          router.push('/diagnostic');
+          setError(`Could not join squad: ${joinResult.error}.`);
+          setIsSubmitting(false);
+          setRevealPhase(0);
           return;
         } else {
           finalSquadCode = referralContext.squadCode;
@@ -107,91 +112,165 @@ export default function RegisterPage() {
       completeRegistration(userId, builderNumber);
       trackEvent('registration_completed', { builderNumber });
 
-      // Simulate a small delay for dramatic effect
+      // Add a slight dramatic delay before showing the final result
       setTimeout(() => {
-        setIsSubmitting(false);
-      }, 1000);
+        setRevealPhase(2);
+      }, 1500);
       
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError("An unexpected error occurred. Please try again.");
       setIsSubmitting(false);
+      setRevealPhase(0);
     }
   };
 
   if (!mounted || !profile || !projectResult) return null;
 
-  if (registration.registered) {
+  // Reveal Phase 2: Success
+  if (registration.registered || revealPhase === 2) {
     return (
-      <div className="flex flex-col min-h-screen bg-black text-white items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-black to-black" />
+      <div className="flex flex-col min-h-[100dvh] bg-background text-foreground items-center justify-center p-6 relative overflow-hidden">
+        {/* Deep cinematic background for reveal */}
+        <div className="absolute inset-0 z-0 bg-black" />
+        <motion.div 
+          className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-accent/30 via-black to-black opacity-0"
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.5 }}
+        />
+        <div className="absolute inset-0 bg-grid-pattern opacity-10 z-0 pointer-events-none" />
         
         <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="text-center z-10"
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2, type: "spring" }}
+          className="text-center z-10 max-w-2xl w-full"
         >
-          <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-8 border border-blue-500/30">
-            <ShieldCheck className="text-blue-500 w-10 h-10" />
-          </div>
-          
-          <p className="text-zinc-400 font-mono mb-4 tracking-widest text-sm">MISSION SECURED</p>
-          <h1 className="text-5xl md:text-7xl font-bold mb-2">BUILDER #{registration.builderNumber}</h1>
-          <p className="text-xl text-zinc-300 mb-12">Your spot is confirmed.</p>
-          
-          <button 
-            onClick={() => router.push('/squad')}
-            className="glow-button px-12 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-[1.02] transition-transform flex items-center gap-2 mx-auto"
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.5, type: "spring" }}
+            className="w-24 h-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-8 border border-accent/40 shadow-[0_0_50px_rgba(59,130,246,0.3)] relative"
           >
-            Enter Command Center <ArrowRight size={20} />
-          </button>
+            <div className="absolute inset-0 rounded-full border border-accent/60 animate-ping opacity-20" />
+            <ShieldCheck className="text-accent w-12 h-12" />
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+          >
+            <p className="text-muted font-mono mb-4 tracking-[0.3em] text-sm uppercase">Mission Secured</p>
+            <h1 className="text-6xl md:text-8xl font-bold mb-4 tracking-tighter text-white">
+              BUILDER <span className="text-accent">#{registration.builderNumber}</span>
+            </h1>
+            <p className="text-xl text-zinc-400 mb-12 font-light">Your project DNA has been synchronized.</p>
+            
+            <Button 
+              size="lg"
+              onClick={() => router.push('/squad')}
+              className="px-10 gap-3 shadow-[0_0_40px_rgba(59,130,246,0.4)]"
+            >
+              ENTER COMMAND CENTER <ArrowRight size={20} />
+            </Button>
+          </motion.div>
         </motion.div>
       </div>
     );
   }
 
+  // Phase 1: Scanning / Generating
+  if (revealPhase === 1) {
+    return (
+      <div className="flex flex-col min-h-[100dvh] bg-background text-foreground items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid-pattern opacity-5 z-0" />
+        <div className="z-10 flex flex-col items-center">
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+            className="w-20 h-20 border-t-2 border-accent border-r-2 rounded-full mb-8 opacity-80"
+          />
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="font-mono tracking-widest text-accent uppercase text-sm animate-pulse"
+          >
+            Encrypting Builder Identity...
+          </motion.p>
+        </div>
+      </div>
+    );
+  }
+
+  // Phase 0: Form
   return (
-    <div className="flex flex-col min-h-screen bg-black text-white p-6 items-center">
-      <div className="max-w-md w-full mt-24">
-        <h1 className="text-4xl font-bold mb-2 text-center">Secure Your Spot</h1>
-        <p className="text-zinc-400 mb-8 text-center">
-          Join the 60-minute workshop to build your <span className="text-white">Project DNA</span> live.
-        </p>
+    <div className="flex flex-col min-h-[100dvh] bg-background text-foreground p-6 items-center justify-center relative overflow-hidden">
+      
+      {/* Background elements */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-ai/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md w-full relative z-10"
+      >
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-muted-bg/50 border border-border mb-6">
+            <Lock className="text-muted w-6 h-6" />
+          </div>
+          <h1 className="text-4xl font-bold mb-3 tracking-tight">Secure Your Identity</h1>
+          <p className="text-muted leading-relaxed">
+            Register to lock in your Project DNA and access the command center.
+          </p>
+        </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
+        {error && (
+          <div className="mb-6 p-4 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="relative group">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted w-5 h-5 group-focus-within:text-white transition-colors" />
             <input 
               type="email" 
-              placeholder="Email Address" 
+              placeholder="Primary Email Address" 
               required
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors"
+              onChange={e => { setError(''); setEmail(e.target.value); }}
+              className="w-full bg-muted-bg/50 border border-border rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors placeholder:text-muted/50 text-white"
             />
           </div>
           
-          <div className="relative">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
+          <div className="relative group">
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-muted w-5 h-5 group-focus-within:text-white transition-colors" />
             <input 
               type="tel" 
               placeholder="WhatsApp Number" 
               required
               value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors"
+              onChange={e => { setError(''); setPhone(e.target.value); }}
+              className="w-full bg-muted-bg/50 border border-border rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors placeholder:text-muted/50 text-white"
             />
           </div>
           
-          <button 
+          <Button 
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 mt-4 bg-white text-black rounded-xl font-bold text-lg hover:bg-zinc-200 transition-colors disabled:opacity-50"
+            className="w-full py-6 mt-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] gap-2 group"
           >
-            {isSubmitting ? 'Securing Spot...' : 'Claim My Builder Number'}
-          </button>
+            <Fingerprint className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" />
+            SECURE BUILDER IDENTITY
+          </Button>
+
+          <p className="text-center text-[10px] font-mono text-muted/60 mt-4 uppercase tracking-wider">
+            End-to-End Encrypted Handshake
+          </p>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

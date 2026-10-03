@@ -2,9 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { Share2, Copy, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Share2, Copy, CheckCircle2, Users, AlertCircle, Share, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
+import { Button } from '@/components/ui/Button';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SquadPage() {
   const router = useRouter();
@@ -43,8 +45,9 @@ export default function SquadPage() {
   const allRoles = ['BUILDER', 'SOLVER', 'SHIPPER'];
   const occupiedRoles = squadMembers.map(m => m.role);
   const missingRoles = allRoles.filter(r => !occupiedRoles.includes(r));
+  const isComplete = missingRoles.length === 0;
   
-  const neededText = missingRoles.length > 0 
+  const neededText = !isComplete 
     ? `and still need a ${missingRoles.join(' + ')}.` 
     : `and our squad is complete!`;
     
@@ -77,116 +80,167 @@ export default function SquadPage() {
 
   const getRoleStatus = (roleName: string) => {
     const member = squadMembers.find(m => m.role === roleName);
-    return member ? member.name : 'WAITING';
+    return member ? member.name : null;
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-black text-white p-6">
-      <div className="max-w-4xl mx-auto w-full pt-8">
+    <div className="flex flex-col min-h-[100dvh] bg-background text-foreground relative overflow-hidden">
+      {/* Background depth */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className={`absolute top-[10%] right-[10%] w-[600px] h-[600px] rounded-full blur-[120px] mix-blend-screen opacity-20 transition-colors duration-1000 ${isComplete ? 'bg-success' : 'bg-accent'}`} />
+        <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+      </div>
+
+      <div className="max-w-6xl mx-auto w-full px-6 pt-24 pb-12 relative z-10 flex-1 flex flex-col">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6 border-b border-border pb-6">
           <div>
-            <h1 className="text-3xl font-bold mb-1">COMMAND CENTER</h1>
-            <p className="text-zinc-400 font-mono">SQUAD: {currentSquad.code}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="text-muted" size={20} />
+              <h1 className="text-sm font-mono tracking-widest text-muted uppercase">Command Center</h1>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
+              Squad <span className={isComplete ? "text-success" : "text-accent"}>{currentSquad.code}</span>
+            </h2>
           </div>
-          <button 
-            onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm hover:bg-zinc-800 transition-colors"
-          >
-            View Live Mission Feed
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] font-mono tracking-[0.2em] text-muted uppercase mb-1">Squad Status</p>
+              <p className={`font-mono font-bold text-lg ${isComplete ? 'text-success' : 'text-white'}`}>
+                {squadMembers.length} / 3 ASSEMBLED
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => router.push('/dashboard')}
+              className="gap-2"
+            >
+              MISSION FEED <ExternalLink size={14} />
+            </Button>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 mb-12">
-          {/* Squad Status */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <ShieldAlert className="text-blue-500" /> SQUAD FORMATION
-            </h2>
+        <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-8 lg:gap-12 flex-1">
+          {/* Squad Roster */}
+          <div className="flex flex-col gap-4">
+            <h3 className="font-mono text-xs tracking-widest text-muted uppercase mb-2">Mission Roster</h3>
             
-            <div className="space-y-4 relative">
-              <div className="absolute left-6 top-6 bottom-6 w-px bg-zinc-800" />
-              
-              {['BUILDER', 'SOLVER', 'SHIPPER'].map((role, idx) => {
-                const memberName = getRoleStatus(role);
-                const isFilled = memberName !== 'WAITING';
-                
-                return (
-                  <div key={role} className="flex items-center gap-4 relative z-10">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border-4 border-black ${isFilled ? 'bg-blue-600' : 'bg-zinc-800 border-zinc-700'}`}>
-                      {isFilled && <CheckCircle2 size={20} className="text-white" />}
-                    </div>
-                    <div className="flex-1 bg-black border border-zinc-800 rounded-xl p-4">
-                      <p className="text-xs text-zinc-500 font-mono mb-1">{role}</p>
-                      <p className={`font-bold ${isFilled ? 'text-white' : 'text-zinc-600'}`}>
-                        {memberName}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            
-            <div className="mt-8 pt-6 border-t border-zinc-800 flex justify-between items-center">
-              <p className="text-zinc-400 text-sm">Squad Status</p>
-              <p className="font-mono font-bold text-blue-400">{squadMembers.length} / 3 COMPLETE</p>
+            <div className={`flex flex-col gap-3 p-6 rounded-2xl border transition-colors duration-700 ${isComplete ? 'bg-success/5 border-success/30' : 'bg-muted-bg/30 border-border'}`}>
+              <AnimatePresence>
+                {allRoles.map((role, idx) => {
+                  const memberName = getRoleStatus(role);
+                  const isFilled = memberName !== null;
+                  
+                  return (
+                    <motion.div 
+                      key={role} 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className={`flex items-center gap-4 p-4 rounded-xl border ${isFilled ? 'bg-black border-white/10' : 'bg-black/50 border-dashed border-white/10'}`}
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${isFilled ? (isComplete ? 'bg-success text-black' : 'bg-accent text-white') : 'bg-transparent border border-muted text-muted'}`}>
+                        {isFilled ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-mono tracking-widest text-muted uppercase">{role}</p>
+                        <p className={`font-semibold truncate ${isFilled ? 'text-white text-lg' : 'text-muted italic'}`}>
+                          {isFilled ? memberName : `OPEN SLOT: ${role}`}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+
+              {isComplete && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="mt-4 p-4 rounded-xl bg-success/20 border border-success/30 text-center"
+                >
+                  <p className="font-mono tracking-widest text-success font-bold uppercase text-sm">
+                    Ready for Workshop
+                  </p>
+                </motion.div>
+              )}
             </div>
           </div>
 
           {/* Viral Action */}
-          <div className="bg-blue-950/20 border border-blue-900/30 rounded-3xl p-8 flex flex-col justify-center text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[60px] rounded-full pointer-events-none" />
+          <div className="flex flex-col gap-4">
+            <h3 className="font-mono text-xs tracking-widest text-muted uppercase mb-2">Recruitment Protocol</h3>
             
-            {missingRoles.length === 0 ? (
-              <>
-                <h3 className="text-2xl font-bold mb-4 relative z-10">SQUAD COMPLETE</h3>
-                <p className="text-zinc-400 mb-8 relative z-10">
-                  Your three-person build team is ready. Your squad is ready for the 60-minute build.
-                </p>
-                <div className="space-y-3 relative z-10">
-                  <button 
+            <div className="glass-panel rounded-2xl p-8 relative overflow-hidden flex-1 flex flex-col justify-center">
+              {isComplete ? (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center"
+                >
+                  <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="text-success w-8 h-8" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-3">SQUAD COMPLETE</h3>
+                  <p className="text-muted mb-8 leading-relaxed">
+                    Your three-person build team is fully assembled. Prepare for the 60-minute live build sequence.
+                  </p>
+                  <Button 
+                    size="lg"
                     onClick={() => router.push('/dashboard')}
-                    className="w-full py-4 bg-white text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                    className="w-full shadow-[0_0_30px_rgba(16,185,129,0.2)] bg-white text-black hover:bg-zinc-200"
                   >
-                    View Mission Dashboard
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="text-2xl font-bold mb-4 relative z-10">Complete Your Squad</h3>
-                <p className="text-zinc-400 mb-8 relative z-10">
-                  You cannot ship the project alone. Recruit a {missingRoles.join(' and a ')} from your campus.
-                </p>
-                
-                <div className="space-y-3 relative z-10">
-                  <button 
-                    onClick={shareWhatsApp}
-                    className="w-full py-4 bg-[#25D366] text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-                  >
-                    Share on WhatsApp
-                  </button>
-                  <button 
-                    onClick={shareNative}
-                    className="w-full py-4 bg-white text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-                  >
-                    <Share2 size={18} /> Share Invite Link
-                  </button>
+                    ACCESS MISSION DASHBOARD
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col h-full"
+                >
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-bold mb-3">Recruit Your Team</h3>
+                    <p className="text-muted leading-relaxed">
+                      You cannot ship the project alone. Share this classified link to recruit a <span className="text-white font-medium">{missingRoles.join(' and a ')}</span> from your campus.
+                    </p>
+                  </div>
                   
-                  <button 
-                    onClick={copyLink}
-                    className="w-full py-4 bg-black border border-zinc-800 text-white rounded-xl hover:bg-zinc-900 transition-colors flex items-center justify-center gap-2"
-                  >
-                    {copied ? <CheckCircle2 size={18} className="text-green-500" /> : <Copy size={18} />}
-                    {copied ? 'Link Copied!' : 'Copy Link'}
-                  </button>
-                </div>
-              </>
-            )}
+                  <div className="space-y-4 mt-auto">
+                    <Button 
+                      size="lg"
+                      onClick={shareWhatsApp}
+                      className="w-full bg-[#25D366] text-black hover:bg-[#20bd5a] border-none"
+                    >
+                      SHARE ON WHATSAPP
+                    </Button>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button 
+                        variant="secondary"
+                        onClick={shareNative}
+                        className="w-full gap-2 text-xs"
+                      >
+                        <Share2 size={16} /> SHARE LINK
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        onClick={copyLink}
+                        className="w-full gap-2 text-xs"
+                      >
+                        {copied ? <CheckCircle2 size={16} className="text-success" /> : <Copy size={16} />}
+                        {copied ? 'COPIED!' : 'COPY LINK'}
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </div>
         </div>
-
       </div>
     </div>
   );
