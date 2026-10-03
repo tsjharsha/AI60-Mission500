@@ -33,6 +33,30 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     
     try {
+      // 0. Preflight Squad Validation
+      if (referralContext.squadCode) {
+        try {
+          const checkRes = await fetch(`/api/squads/${referralContext.squadCode}`);
+          const squadData = await checkRes.json();
+          
+          if (!checkRes.ok || !squadData.squad) {
+            alert("That squad invite is no longer valid. Redirecting to start your own.");
+            setIsSubmitting(false);
+            router.push('/diagnostic');
+            return;
+          }
+          
+          if (squadData.isFull) {
+            alert("That squad filled up while you were joining. Redirecting to start your own.");
+            setIsSubmitting(false);
+            router.push('/diagnostic');
+            return;
+          }
+        } catch (checkErr) {
+          console.error("Squad preflight check failed", checkErr);
+        }
+      }
+
       // 1. Register User
       const { userId, builderNumber } = await registerUser(
         { ...profile, email, phone },

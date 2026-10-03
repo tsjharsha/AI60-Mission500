@@ -87,7 +87,7 @@ export async function GET() {
     
     // Seeded distributions for demo
     const seededCampus: Record<string, number> = { 'VIT Vellore': 142, 'SRM Chennai': 98, 'BITS Pilani': 45 };
-    const seededArchetypes: Record<string, number> = { 'The Architect': 110, 'The Optimizer': 85, 'The Visionary': 133 };
+    const seededArchetypes: Record<string, number> = { 'THE PROBLEM SOLVER': 110, 'THE BUILDER': 85, 'THE PRODUCT THINKER': 133 };
     const seededSources: Record<string, number> = { 'direct': 48, 'whatsapp': 280 };
 
     if (mode === 'HYBRID') {

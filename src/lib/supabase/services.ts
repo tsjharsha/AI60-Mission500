@@ -1,4 +1,3 @@
-import { supabase, isSupabaseConfigured } from './client';
 import { v4 as uuidv4 } from 'uuid';
 
 export const generateSquadCode = () => {
@@ -19,7 +18,18 @@ export const registerUser = async (data: any, referralContext: any, projectResul
   } catch (e) {
     console.error('Registration fetch failed, falling back', e);
     const userId = uuidv4();
-    return { userId, builderNumber: 328 + Math.floor(Math.random() * (499 - 328)) };
+    let currentNumber = 328;
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('ai60_demo_builder_number');
+      if (stored) {
+        currentNumber = parseInt(stored, 10) + 1;
+      }
+      if (currentNumber > 500) {
+        currentNumber = 500;
+      }
+      localStorage.setItem('ai60_demo_builder_number', currentNumber.toString());
+    }
+    return { userId, builderNumber: currentNumber };
   }
 };
 

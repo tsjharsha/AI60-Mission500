@@ -1,12 +1,10 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { Share2, Copy, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 export default function SquadPage() {
   const router = useRouter();
@@ -39,20 +37,21 @@ export default function SquadPage() {
   if (!mounted || !registration.registered) return null;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-  const shareUrl = `${appUrl}/join/${currentSquad.code}?source=whatsapp&ref=${registration.userId}`;
+  
+  const getShareUrl = (source: string) => `${appUrl}/join/${currentSquad.code}?source=${source}&ref=${registration.userId}`;
   
   const allRoles = ['BUILDER', 'SOLVER', 'SHIPPER'];
   const occupiedRoles = squadMembers.map(m => m.role);
   const missingRoles = allRoles.filter(r => !occupiedRoles.includes(r));
   
-  let neededText = missingRoles.length > 0 
+  const neededText = missingRoles.length > 0 
     ? `and still need a ${missingRoles.join(' + ')}.` 
     : `and our squad is complete!`;
     
-  const shareText = `I got assigned ${projectResult?.squadRole} in NxtWave AI60. We're building ${projectResult?.project?.name} ${neededText} Discover your Project DNA and join my squad: ${shareUrl}`;
+  const getShareText = (source: string) => `I got assigned ${projectResult?.squadRole} in NxtWave AI60. We're building ${projectResult?.project?.name} ${neededText} Discover your Project DNA and join my squad: ${getShareUrl(source)}`;
 
   const copyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
+    navigator.clipboard.writeText(getShareUrl('copy'));
     setCopied(true);
     trackEvent('squad_invite_shared', { method: 'copy', squadCode: currentSquad.code });
     setTimeout(() => setCopied(false), 2000);
@@ -60,14 +59,14 @@ export default function SquadPage() {
   
   const shareWhatsApp = () => {
     trackEvent('squad_invite_shared', { method: 'whatsapp', squadCode: currentSquad.code });
-    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+    window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp'))}`, '_blank');
   };
   
   const shareNative = () => {
     if (navigator.share) {
       navigator.share({
         title: 'Join my AI Squad',
-        text: shareText,
+        text: getShareText('native'),
       }).then(() => {
         trackEvent('squad_invite_shared', { method: 'native', squadCode: currentSquad.code });
       }).catch(console.error);
@@ -139,33 +138,52 @@ export default function SquadPage() {
           <div className="bg-blue-950/20 border border-blue-900/30 rounded-3xl p-8 flex flex-col justify-center text-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[60px] rounded-full pointer-events-none" />
             
-            <h3 className="text-2xl font-bold mb-4 relative z-10">Complete Your Squad</h3>
-            <p className="text-zinc-400 mb-8 relative z-10">
-              You cannot ship the project alone. Recruit {missingRoles.length > 0 ? `a ${missingRoles.join(' and a ')}` : 'new members'} from your campus.
-            </p>
-            
-            <div className="space-y-3 relative z-10">
-              <button 
-                onClick={shareWhatsApp}
-                className="w-full py-4 bg-[#25D366] text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-              >
-                Share on WhatsApp
-              </button>
-              <button 
-                onClick={shareNative}
-                className="w-full py-4 bg-white text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-              >
-                <Share2 size={18} /> Share Invite Link
-              </button>
-              
-              <button 
-                onClick={copyLink}
-                className="w-full py-4 bg-black border border-zinc-800 text-white rounded-xl hover:bg-zinc-900 transition-colors flex items-center justify-center gap-2"
-              >
-                {copied ? <CheckCircle2 size={18} className="text-green-500" /> : <Copy size={18} />}
-                {copied ? 'Link Copied!' : 'Copy Link'}
-              </button>
-            </div>
+            {missingRoles.length === 0 ? (
+              <>
+                <h3 className="text-2xl font-bold mb-4 relative z-10">SQUAD COMPLETE</h3>
+                <p className="text-zinc-400 mb-8 relative z-10">
+                  Your three-person build team is ready. Your squad is ready for the 60-minute build.
+                </p>
+                <div className="space-y-3 relative z-10">
+                  <button 
+                    onClick={() => router.push('/dashboard')}
+                    className="w-full py-4 bg-white text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                  >
+                    View Mission Dashboard
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold mb-4 relative z-10">Complete Your Squad</h3>
+                <p className="text-zinc-400 mb-8 relative z-10">
+                  You cannot ship the project alone. Recruit a {missingRoles.join(' and a ')} from your campus.
+                </p>
+                
+                <div className="space-y-3 relative z-10">
+                  <button 
+                    onClick={shareWhatsApp}
+                    className="w-full py-4 bg-[#25D366] text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                  >
+                    Share on WhatsApp
+                  </button>
+                  <button 
+                    onClick={shareNative}
+                    className="w-full py-4 bg-white text-black rounded-xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                  >
+                    <Share2 size={18} /> Share Invite Link
+                  </button>
+                  
+                  <button 
+                    onClick={copyLink}
+                    className="w-full py-4 bg-black border border-zinc-800 text-white rounded-xl hover:bg-zinc-900 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {copied ? <CheckCircle2 size={18} className="text-green-500" /> : <Copy size={18} />}
+                    {copied ? 'Link Copied!' : 'Copy Link'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
