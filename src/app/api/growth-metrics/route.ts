@@ -42,7 +42,14 @@ export async function GET() {
     // Registrations
     const { data: registrations } = await supabaseServer.from('registrations').select('id, source, squad_id');
     const registrationCount = registrations?.length || 0;
-    const inviteRegistrations = registrations?.filter(r => r.source === 'whatsapp' || r.source === 'squad_invite').length || 0;
+    
+    const INVITE_SOURCES = new Set([
+      'whatsapp',
+      'copy',
+      'native',
+      'squad_invite'
+    ]);
+    const inviteRegistrations = registrations?.filter(r => r.source && INVITE_SOURCES.has(r.source)).length || 0;
 
     // Squads
     const { count: squadsCreated } = await supabaseServer.from('squads').select('*', { count: 'exact', head: true });

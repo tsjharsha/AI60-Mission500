@@ -39,7 +39,7 @@ export default function RegisterPage() {
           const checkRes = await fetch(`/api/squads/${referralContext.squadCode}`);
           const squadData = await checkRes.json();
           
-          if (!checkRes.ok || !squadData.squad) {
+          if (!checkRes.ok || squadData.isValid === false) {
             alert("That squad invite is no longer valid. Redirecting to start your own.");
             setIsSubmitting(false);
             router.push('/diagnostic');
@@ -54,6 +54,9 @@ export default function RegisterPage() {
           }
         } catch (checkErr) {
           console.error("Squad preflight check failed", checkErr);
+          alert("Could not verify squad status due to a network error. Please try again.");
+          setIsSubmitting(false);
+          return;
         }
       }
 
