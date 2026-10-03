@@ -13,11 +13,13 @@ export default function JoinSquadPage() {
   const reduceMotion = useReducedMotion();
   const params = useParams();
   const searchParams = useSearchParams();
-  const { setReferralContext } = useAppStore();
+  const { setReferralContext, profile, projectResult, currentSquad } = useAppStore();
   
   const squadCode = params.code as string;
   const source = searchParams.get('source') || 'squad_invite';
   const ref = searchParams.get('ref') || '';
+  const preview = searchParams.get('preview') === '1';
+  const ownPreview = preview && currentSquad.code === squadCode;
   
   const [squadData, setSquadData] = useState<{
     creatorName: string;
@@ -37,9 +39,10 @@ export default function JoinSquadPage() {
   };
 
   useEffect(() => {
+    if (preview) return;
     trackEvent('squad_invite_opened', { squadCode, source, referrerId: ref });
     setReferralContext({ squadCode, source, referrerId: ref });
-  }, [squadCode, source, ref, setReferralContext]);
+  }, [squadCode, source, ref, preview, setReferralContext]);
 
   useEffect(() => {
     const fetchSquad = async () => {
@@ -82,6 +85,10 @@ export default function JoinSquadPage() {
     );
   }
 
+  const creatorName = ownPreview ? profile.name || squadData.creatorName : squadData.creatorName;
+  const projectName = ownPreview ? projectResult?.project.name || squadData.projectName : squadData.projectName;
+  const exitInvite = preview ? () => router.push('/squad') : startOwnSquad;
+
   if (!squadData.isValid) {
     return (
       <div className="flex flex-col min-h-[100dvh] bg-background text-foreground items-center justify-center p-6 relative overflow-hidden">
@@ -97,10 +104,10 @@ export default function JoinSquadPage() {
           <h1 className="text-3xl font-bold mb-4 tracking-tight">Invalid Link</h1>
           <p className="text-muted leading-relaxed mb-8">This squad invitation has expired or is no longer valid.</p>
           <Button 
-            onClick={startOwnSquad}
+            onClick={exitInvite}
             className="w-full"
           >
-            START MY OWN SQUAD
+            {preview ? 'BACK TO MY SQUAD' : 'START MY OWN SQUAD'}
           </Button>
         </motion.div>
       </div>
@@ -122,10 +129,10 @@ export default function JoinSquadPage() {
           <h1 className="text-3xl font-bold mb-4 tracking-tight">Squad Complete</h1>
           <p className="text-muted leading-relaxed mb-8">This squad has successfully filled all its open slots.</p>
           <Button 
-            onClick={startOwnSquad}
+            onClick={exitInvite}
             className="w-full"
           >
-            START MY OWN SQUAD
+            {preview ? 'BACK TO MY SQUAD' : 'START MY OWN SQUAD'}
           </Button>
         </motion.div>
       </div>
@@ -144,27 +151,27 @@ export default function JoinSquadPage() {
         className="relative z-10 w-full max-w-3xl"
       >
         <div className="mb-8 inline-flex items-center gap-2 border-b border-accent/50 pb-2 font-mono text-xs uppercase tracking-[0.2em] text-accent">
-          <Sparkles size={14} /> An invitation from {squadData.creatorName}
+          <Sparkles size={14} /> {preview ? 'PREVIEW / WHAT YOUR TEAMMATES SEE' : `An invitation from ${creatorName}`}
         </div>
         <h1 className="max-w-3xl text-5xl font-semibold leading-[1.08] tracking-[-0.05em] sm:text-7xl">
           You have a place <span className="text-gradient-accent">in the build.</span>
         </h1>
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted"><strong className="text-white">{squadData.creatorName}</strong> invited you to discover your Project DNA and build <strong className="text-white">{squadData.projectName}</strong> together.</p>
+        <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted"><strong className="text-white">{creatorName}</strong> invited you to discover your Project DNA and build <strong className="text-white">{projectName}</strong> together.</p>
 
         <div className="mt-10 overflow-hidden rounded-[28px] border border-accent/25 bg-[#101722]/90">
           <div className="flex items-center justify-between border-b border-white/10 px-6 py-5 font-mono text-xs tracking-widest text-muted sm:px-8"><span>YOUR SQUAD INVITE</span><Users size={18} className="text-accent" /></div>
           <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-2">
-            <div><p className="eyebrow mb-3">THE PROJECT</p><p className="text-2xl font-semibold leading-tight">{squadData.projectName}</p><p className="mt-3 text-sm text-muted">A 60-minute AI build with your squad.</p></div>
+            <div><p className="eyebrow mb-3">THE PROJECT</p><p className="text-2xl font-semibold leading-tight">{projectName}</p><p className="mt-3 text-sm text-muted">A 60-minute AI build with your squad.</p></div>
             <div><p className="eyebrow mb-3">OPEN ROLES</p><div className="flex flex-wrap gap-2">{squadData.missingRoles.map(role => <span key={role} className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 font-mono text-xs text-blue-100">{role}</span>)}</div><p className="mt-3 text-sm text-muted">Your role is assigned after your diagnostic.</p></div>
           </div>
         </div>
-        <p className="mt-8 text-sm text-muted">First, answer a few questions. You’ll see your own project match before registering.</p>
+        <p className="mt-8 text-sm text-muted">{preview ? 'This is a preview. Your teammates will take the diagnostic before registering.' : 'First, answer a few questions. You’ll see your own project match before registering.'}</p>
         <Button 
           size="lg"
-          onClick={() => router.push('/diagnostic')}
+          onClick={() => router.push(preview ? '/squad' : '/diagnostic')}
           className="mt-6 w-full gap-3 bg-accent text-white hover:bg-blue-500 sm:w-auto"
         >
-          DISCOVER MY PROJECT DNA <ArrowRight size={19} />
+          {preview ? 'BACK TO MY SQUAD' : 'DISCOVER MY PROJECT DNA'} <ArrowRight size={19} />
         </Button>
       </motion.div>
     </div>
