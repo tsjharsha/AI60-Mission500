@@ -6,31 +6,26 @@ import { useAppStore } from '@/store/useAppStore';
 import { useEffect, useState, Suspense } from 'react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
 import { Button } from '@/components/ui/Button';
+import { useMissionPulse } from '@/lib/analytics/useMissionPulse';
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mounted, setMounted] = useState(false);
-  const { setReferralContext, setMode } = useAppStore();
+  const { setReferralContext } = useAppStore();
+  const pulse = useMissionPulse();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     const source = searchParams.get('source') || undefined;
     const squad = searchParams.get('squad') || undefined;
     const ref = searchParams.get('ref') || undefined;
-    const mode = searchParams.get('mode');
     
     if (source || squad || ref) {
       setReferralContext({ source, squadCode: squad, referrerId: ref });
     }
     
-    if (mode === 'sim') {
-      setMode('SIMULATION');
-    }
-    
     trackEvent('landing_view', { source, squad, ref });
-  }, [searchParams, setReferralContext, setMode]);
+  }, [searchParams, setReferralContext]);
 
   const handleStart = () => {
     trackEvent('diagnostic_started');
@@ -39,8 +34,6 @@ function HomeContent() {
       router.push('/diagnostic');
     }, 400); // 400ms transition mask
   };
-
-  const builderCount = mounted ? Math.max(327, Number(localStorage.getItem('ai60_demo_builder_number')) || 327) : 327;
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-background">
@@ -126,10 +119,10 @@ function HomeContent() {
       >
         <div className="flex flex-col items-center">
           <div className="font-mono text-2xl font-bold text-white tabular-nums flex items-center gap-2">
-            {builderCount} <span className="text-muted text-lg font-normal">/ 500</span>
+            {pulse ? pulse.count.toLocaleString() : '—'} <span className="text-muted text-lg font-normal">/ 500</span>
           </div>
           <div className="font-mono text-[10px] tracking-[0.25em] text-accent mt-1.5 uppercase">
-            Builders Discovered
+            Builders Registered {pulse ? `/ ${pulse.mode}` : ''}
           </div>
         </div>
       </motion.div>
