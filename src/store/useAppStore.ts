@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export interface UserProfile {
   name: string;
@@ -42,16 +42,21 @@ interface AppState {
     registered: boolean;
     builderNumber: number;
     userId: string | null;
+    mode?: "LIVE" | "SIMULATION";
   };
   currentSquad: {
     id: string | null;
     code: string | null;
   };
   referralContext: ReferralContext;
-  
+
   setProfile: (data: Partial<UserProfile>) => void;
   setProjectResult: (data: ProjectResult) => void;
-  completeRegistration: (userId: string, builderNumber: number) => void;
+  completeRegistration: (
+    userId: string,
+    builderNumber: number,
+    mode?: "LIVE" | "SIMULATION",
+  ) => void;
   setCurrentSquad: (id: string, code: string) => void;
   setReferralContext: (data: Partial<ReferralContext>) => void;
   reset: () => void;
@@ -72,33 +77,39 @@ export const useAppStore = create<AppState>()(
         code: null,
       },
       referralContext: {},
-      
-      setProfile: (data) => set((state) => ({ profile: { ...state.profile, ...data } })),
+
+      setProfile: (data) =>
+        set((state) => ({ profile: { ...state.profile, ...data } })),
       setProjectResult: (data) => set({ projectResult: data }),
-      completeRegistration: (userId, builderNumber) => set({
-        registration: {
-          registered: true,
-          builderNumber,
-          userId,
-        }
-      }),
-      setCurrentSquad: (id, code) => set({
-        currentSquad: { id, code }
-      }),
-      setReferralContext: (data) => set((state) => ({
-        referralContext: { ...state.referralContext, ...data }
-      })),
-      reset: () => set({ 
-        profile: {}, 
-        projectResult: null, 
-        registration: { registered: false, builderNumber: 0, userId: null },
-        currentSquad: { id: null, code: null },
-        referralContext: {}
-      }),
+      completeRegistration: (userId, builderNumber, mode = "SIMULATION") =>
+        set({
+          registration: {
+            registered: true,
+            builderNumber,
+            userId,
+            mode,
+          },
+        }),
+      setCurrentSquad: (id, code) =>
+        set({
+          currentSquad: { id, code },
+        }),
+      setReferralContext: (data) =>
+        set((state) => ({
+          referralContext: { ...state.referralContext, ...data },
+        })),
+      reset: () =>
+        set({
+          profile: {},
+          projectResult: null,
+          registration: { registered: false, builderNumber: 0, userId: null },
+          currentSquad: { id: null, code: null },
+          referralContext: {},
+        }),
     }),
     {
-      name: 'ai60-mission500-store',
+      name: "ai60-mission500-store",
       storage: createJSONStorage(() => localStorage),
-    }
-  )
+    },
+  ),
 );

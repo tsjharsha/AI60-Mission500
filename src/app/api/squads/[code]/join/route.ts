@@ -1,89 +1,68 @@
-import { NextResponse } from 'next/server';
-import { supabaseServer, isSupabaseServerConfigured } from '@/lib/supabase/server';
-import { v4 as uuidv4 } from 'uuid';
-
-export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase/server";
+import { demo } from "@/lib/server/demo";
+import { requireBuilder } from "@/lib/server/session";
+import { fail, HttpError, limit, readBody } from "@/lib/server/http";
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ code: string }> },
+) {
   try {
+    limit(req, "join-squad");
+    const session = await requireBuilder();
     const { code } = await params;
-    const { userId, naturalRole } = await req.json();
-
-    if (!isSupabaseServerConfigured || !supabaseServer) {
-      return NextResponse.json({ assignedRole: naturalRole, success: true });
+    if (!/^A[A-Z0-9]{4,12}$/.test(code))
+      throw new HttpError("Invite not found.", 404);
+    const body = await readBody(req);
+    const role = ["BUILDER", "SOLVER", "SHIPPER"].includes(
+      String(body.naturalRole),
+    )
+      ? String(body.naturalRole)
+      : "BUILDER";
+    if (supabaseServer) {
+      const { data, error } = await supabaseServer.rpc("ai60_join_squad", {
+        p_code: code,
+        p_user: session.userId,
+        p_role: role,
+      });
+      if (error) throw new Error("Squad join transaction failed.");
+      if (data.error) throw new HttpError(data.error, data.status || 409);
+      return NextResponse.json(data);
     }
-
-    // 1. Find squad by code
-    const { data: squad, error: squadError } = await supabaseServer
-      .from('squads')
-      .select('id, code')
-      .eq('code', code)
-      .single();
-
-    if (squadError || !squad) {
-      return NextResponse.json({ error: 'That squad invite is no longer valid.', success: false }, { status: 404 });
-    }
-
-    // 2. Load existing members
-    const { data: members } = await supabaseServer
-      .from('squad_members')
-      .select('role, user_id')
-      .eq('squad_id', squad.id);
-
-    const existingMembers = members || [];
-
-    // Check duplicate join
-    if (existingMembers.some(m => m.user_id === userId)) {
-      const existingRole = existingMembers.find(m => m.user_id === userId)?.role;
-      return NextResponse.json({ assignedRole: existingRole, success: true, message: 'Already a member' });
-    }
-
-    // 7. Prevent more than 3 members
-    if (existingMembers.length >= 3) {
-      return NextResponse.json({ error: 'This squad is already complete.', success: false }, { status: 400 });
-    }
-
-    // 3. Calculate occupied roles
-    const occupiedRoles = existingMembers.map(m => m.role);
-    const allRoles = ['BUILDER', 'SOLVER', 'SHIPPER'];
-    
-    // 4. Assign role
-    let assignedRole = naturalRole || 'BUILDER';
-    
-    if (occupiedRoles.includes(assignedRole)) {
-      // Fallback logic
-      const fallbacks: Record<string, string[]> = {
-        'BUILDER': ['SHIPPER', 'SOLVER'],
-        'SOLVER': ['BUILDER', 'SHIPPER'],
-        'SHIPPER': ['BUILDER', 'SOLVER']
-      };
-      
-      const roleFallbacks = fallbacks[assignedRole] || ['BUILDER', 'SOLVER', 'SHIPPER'];
-      for (const fallback of roleFallbacks) {
-        if (!occupiedRoles.includes(fallback)) {
-          assignedRole = fallback;
-          break;
-        }
-      }
-    }
-
-    // 5. Insert squad_member
-    await supabaseServer.from('squad_members').insert({
-      id: uuidv4(),
-      squad_id: squad.id,
-      user_id: userId,
-      role: assignedRole
-    });
-
-    const newMembersCount = existingMembers.length + 1;
-
-    // 8. return expected data
+    const squad = demo.squads.get(code);
+    const builder = demo.builders.get(session.userId);
+    if (!squad) throw new HttpError("Invite not found or demo expired.", 404);
+    if (!builder) throw new HttpError("Demo session expired.", 401);
+    const existing = squad.members.find((m) => m.userId === session.userId);
+    if (!existing && squad.members.length >= 3)
+      throw new HttpError(
+        "This squad is full. Your workshop registration is still valid.",
+        409,
+      );
+    if (
+      !existing &&
+      [...demo.squads.values()].some((s) =>
+        s.members.some((m) => m.userId === session.userId),
+      )
+    )
+      throw new HttpError("You already belong to a squad.", 409);
+    const assignedRole =
+      existing?.role ||
+      [role, "BUILDER", "SOLVER", "SHIPPER"].find(
+        (r) => !squad.members.some((m) => m.role === r),
+      )!;
+    if (!existing)
+      squad.members.push({
+        userId: session.userId,
+        name: builder.profile.name?.split(" ")[0] || "Builder",
+        role: assignedRole,
+      });
     return NextResponse.json({
-      squad: { id: squad.id, code: squad.code },
+      squad: { id: squad.id, code },
       assignedRole,
-      members: newMembersCount,
-      success: true
+      success: true,
     });
-  } catch (err) {
-    console.error('API /squads/[code]/join: Error', err);
-    return NextResponse.json({ error: 'Internal server error', success: false }, { status: 500 });
+  } catch (error) {
+    return fail(error);
   }
 }

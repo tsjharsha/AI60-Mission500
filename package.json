@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test tests/*.test.cjs",
+    "typecheck": "tsc --noEmit",
+    "test:integration": "node tests/run-integration.cjs",
+    "test:browser": "node tests/browser.cjs",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/*.cjs\" \"scripts/*.cjs\" \"docs/*.md\" README.md package.json eslint.config.mjs",
+    "test:failure": "node tests/live-failure.cjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -29,6 +35,8 @@
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "playwright": "^1.62.1",
+    "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

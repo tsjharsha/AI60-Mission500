@@ -1,71 +1,45 @@
-import { v4 as uuidv4 } from 'uuid';
-
-export const generateSquadCode = () => {
-  return 'A' + Math.random().toString(36).substring(2, 6).toUpperCase();
+import type {
+  UserProfile,
+  ProjectResult,
+  ReferralContext,
+} from "@/store/useAppStore";
+export async function request<T>(url: string, body?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    signal: AbortSignal.timeout(15000),
+    cache: "no-store",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Request failed. Please retry.");
+  return data as T;
+}
+export type RegistrationResponse = {
+  userId: string;
+  builderNumber: number;
+  mode: "LIVE" | "SIMULATION";
 };
-
-export const registerUser = async (data: any, referralContext: any, projectResult: any) => {
-  try {
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data, referralContext, projectResult })
-    });
-    
-    if (!res.ok) throw new Error('Failed to register');
-    
-    return await res.json();
-  } catch (e) {
-    console.error('Registration fetch failed, falling back', e);
-    const userId = uuidv4();
-    let currentNumber = 328;
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('ai60_demo_builder_number');
-      if (stored) {
-        currentNumber = parseInt(stored, 10) + 1;
-      }
-      if (currentNumber > 500) {
-        currentNumber = 500;
-      }
-      localStorage.setItem('ai60_demo_builder_number', currentNumber.toString());
-    }
-    return { userId, builderNumber: currentNumber };
-  }
-};
-
-export const createSquad = async (userId: string, projectName: string, role: string = 'BUILDER') => {
-  try {
-    const res = await fetch('/api/squads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, projectName, role })
-    });
-    if (!res.ok) throw new Error('Failed to create squad');
-    return await res.json();
-  } catch (e) {
-    console.error('Squad creation fetch failed, falling back', e);
-    const code = generateSquadCode();
-    return { id: code, code };
-  }
-};
-
-export const joinSquad = async (code: string, userId: string, naturalRole: string) => {
-  try {
-    const res = await fetch(`/api/squads/${code}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, naturalRole })
-    });
-    
-    const data = await res.json();
-    
-    if (!res.ok) {
-      return { error: data.error || 'Failed to join squad', success: false };
-    }
-    
-    return data;
-  } catch (e) {
-    console.error('Join squad fetch failed, falling back', e);
-    return { error: 'Network error', assignedRole: naturalRole, success: false };
-  }
-};
+export const registerUser = (
+  data: Partial<UserProfile> & { email: string; phone: string },
+  referralContext: ReferralContext,
+  projectResult: ProjectResult,
+) =>
+  request<RegistrationResponse>("/api/register", {
+    data,
+    referralContext,
+    projectResult,
+    consent: true,
+  });
+export const createSquad = (
+  _userId: string,
+  projectName: string,
+  role = "BUILDER",
+) =>
+  request<{ id: string; code: string }>("/api/squads", { projectName, role });
+export const joinSquad = (code: string, _userId: string, naturalRole: string) =>
+  request<{
+    squad: { id: string; code: string };
+    assignedRole: string;
+    success: boolean;
+  }>(`/api/squads/${encodeURIComponent(code)}/join`, { naturalRole });
