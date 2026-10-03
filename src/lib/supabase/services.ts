@@ -6,82 +6,50 @@ export const generateSquadCode = () => {
 };
 
 export const registerUser = async (data: any, referralContext: any, projectResult: any) => {
-  const userId = uuidv4();
-  
-  if (!isSupabaseConfigured || !supabase) {
-    // Fallback mode
-    const builderNum = 328 + Math.floor(Math.random() * 1000);
-    return { userId, builderNumber: builderNum };
-  }
-
   try {
-    // 1. Insert user
-    await supabase.from('users').insert({
-      id: userId,
-      name: data.name,
-      college: data.college,
-      branch: data.branch,
-      graduation_year: data.graduationYear,
-      target_role: data.targetRole,
-      skills: data.skills,
-      ai_experience: data.aiExperience,
-      placement_confidence: data.placementConfidence,
-      archetype: projectResult.archetype,
-      ai_readiness_score: projectResult.aiReadinessScore,
-      recommended_project: projectResult.project,
-      squad_role: projectResult.squadRole
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, referralContext, projectResult })
     });
-
-    // 2. Determine builder number (simple sequence approximation)
-    const { count } = await supabase.from('registrations').select('*', { count: 'exact', head: true });
-    const builderNumber = 328 + (count || 0);
-
-    // 3. Insert registration
-    await supabase.from('registrations').insert({
-      id: uuidv4(),
-      user_id: userId,
-      email: data.email,
-      phone: data.phone,
-      builder_number: builderNumber,
-      source: referralContext.source || null,
-      referrer_user_id: referralContext.referrerId || null,
-      squad_id: referralContext.squadCode || null, // Will map to actual squad_id if valid
-    });
-
-    return { userId, builderNumber };
+    
+    if (!res.ok) throw new Error('Failed to register');
+    
+    return await res.json();
   } catch (e) {
-    console.error('Registration failed, falling back', e);
+    console.error('Registration fetch failed, falling back', e);
+    const userId = uuidv4();
     return { userId, builderNumber: 328 + Math.floor(Math.random() * 1000) };
   }
 };
 
-export const createSquad = async (userId: string, projectName: string) => {
-  const code = generateSquadCode();
-  
-  if (!isSupabaseConfigured || !supabase) {
+export const createSquad = async (userId: string, projectName: string, role: string = 'BUILDER') => {
+  try {
+    const res = await fetch('/api/squads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, projectName, role })
+    });
+    if (!res.ok) throw new Error('Failed to create squad');
+    return await res.json();
+  } catch (e) {
+    console.error('Squad creation fetch failed, falling back', e);
+    const code = generateSquadCode();
     return { id: code, code };
   }
+};
 
+export const joinSquad = async (code: string, userId: string, naturalRole: string) => {
   try {
-    const squadId = uuidv4();
-    await supabase.from('squads').insert({
-      id: squadId,
-      code: code,
-      created_by: userId,
-      project_name: projectName
+    const res = await fetch(`/api/squads/${code}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, naturalRole })
     });
-    
-    // Add creator as member
-    await supabase.from('squad_members').insert({
-      id: uuidv4(),
-      squad_id: squadId,
-      user_id: userId,
-      role: 'BUILDER' // Default creator role
-    });
-
-    return { id: squadId, code };
+    if (!res.ok) throw new Error('Failed to join squad');
+    return await res.json();
   } catch (e) {
-    console.error('Squad creation failed, falling back', e);
-    return { id: code, code };
+    console.error('Join squad fetch failed, falling back', e);
+    return { assignedRole: naturalRole, success: false };
   }
 };

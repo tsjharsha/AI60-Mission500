@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Mail, Phone, ArrowRight } from 'lucide-react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
-import { registerUser, createSquad } from '@/lib/supabase/services';
+import { registerUser, createSquad, joinSquad } from '@/lib/supabase/services';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -43,15 +43,28 @@ export default function RegisterPage() {
       completeRegistration(userId, builderNumber);
       trackEvent('registration_completed', { builderNumber });
       
-      // 2. Create Squad if not joining one
+      // 2. Create or Join Squad
       if (!referralContext.squadCode) {
-        const squad = await createSquad(userId, projectResult?.project?.name || 'AI Project');
+        // Create
+        const squad = await createSquad(
+          userId, 
+          projectResult?.project?.name || 'AI Project',
+          projectResult?.squadRole || 'BUILDER'
+        );
         setCurrentSquad(squad.id, squad.code);
         trackEvent('squad_created', { squadCode: squad.code });
       } else {
-        // If they joined via invite, we set the squad from context
-        setCurrentSquad(referralContext.squadCode, referralContext.squadCode);
-        trackEvent('squad_joined', { squadCode: referralContext.squadCode });
+        // Join
+        const joinResult = await joinSquad(
+          referralContext.squadCode, 
+          userId, 
+          projectResult?.squadRole || 'BUILDER'
+        );
+        setCurrentSquad(referralContext.squadCode, referralContext.squadCode); // the API returns ID?
+        trackEvent('squad_joined', { squadCode: referralContext.squadCode, role: joinResult.assignedRole });
+        if (joinResult.error) {
+          alert(joinResult.error); // E.g., 'Squad Full' handled elegantly later, simple alert for now
+        }
       }
 
       // Simulate a small delay for dramatic effect

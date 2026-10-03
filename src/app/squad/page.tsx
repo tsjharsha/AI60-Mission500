@@ -23,26 +23,23 @@ export default function SquadPage() {
     }
     trackEvent('dashboard_viewed', { squadCode: currentSquad.code });
     
-    // Try to load real members if configured
-    if (isSupabaseConfigured && supabase && currentSquad.id) {
-      supabase.from('squad_members')
-        .select('*, users(name)')
-        .eq('squad_id', currentSquad.id)
-        .then(({ data }) => {
-          if (data && data.length > 0) {
-            setSquadMembers(data.map(m => ({
-              role: m.role,
-              name: m.users?.name || 'Builder'
-            })));
+    // Load real members via API
+    if (currentSquad.code) {
+      fetch(`/api/squads/${currentSquad.code}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.members) {
+            setSquadMembers(data.members);
           }
-        });
+        })
+        .catch(console.error);
     }
   }, [registration.registered, router, currentSquad, profile.name, projectResult?.squadRole]);
 
   if (!mounted || !registration.registered) return null;
 
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const shareUrl = `${appUrl}/join/${currentSquad.code}?source=whatsapp`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  const shareUrl = `${appUrl}/join/${currentSquad.code}?source=whatsapp&ref=${registration.userId}`;
   const shareText = `I got assigned ${projectResult?.squadRole} in NxtWave AI60. We're building ${projectResult?.project?.name} and still need a Solver + Shipper. Discover your Project DNA and join my squad: ${shareUrl}`;
 
   const copyLink = () => {

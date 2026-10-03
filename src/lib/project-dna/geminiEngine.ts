@@ -4,7 +4,7 @@ import { CATALOG } from './projectCatalog';
 import { runDeterministicEngine } from './deterministicEngine';
 
 const getGeminiClient = () => {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
   return new GoogleGenerativeAI(apiKey);
 };
@@ -60,13 +60,27 @@ Return STRICTLY a JSON object matching this schema:
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
-    const parsed = JSON.parse(jsonStr) as DNAResult;
+    const parsed = JSON.parse(jsonStr) as any;
     
-    // basic validation
-    if (parsed.archetype && parsed.project && parsed.squadRole) {
-      return parsed;
+    // Explicit manual validation
+    if (
+      typeof parsed.archetype === 'string' &&
+      typeof parsed.archetypeDescription === 'string' &&
+      typeof parsed.aiReadinessScore === 'number' &&
+      Array.isArray(parsed.strengths) &&
+      typeof parsed.gap === 'string' &&
+      parsed.project &&
+      typeof parsed.project.name === 'string' &&
+      typeof parsed.project.description === 'string' &&
+      typeof parsed.project.whyItFits === 'string' &&
+      Array.isArray(parsed.project.skills) &&
+      typeof parsed.project.estimatedMinutes === 'number' &&
+      typeof parsed.project.difficulty === 'string' &&
+      ['BUILDER', 'SOLVER', 'SHIPPER'].includes(parsed.squadRole)
+    ) {
+      return parsed as DNAResult;
     }
-    throw new Error("Malformed JSON from Gemini");
+    throw new Error("Invalid schema from Gemini");
   } catch (error) {
     console.error("Gemini engine failed, falling back to deterministic:", error);
     return runDeterministicEngine(input);

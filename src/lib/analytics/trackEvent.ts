@@ -17,15 +17,22 @@ export const trackEvent = async (eventName: string, metadata: any = {}) => {
   if (isSupabaseConfigured && supabase) {
     try {
       const sessionId = getSessionId();
+      
+      // Filter out PII
+      const safeMetadata = { ...metadata };
+      delete safeMetadata.name;
+      delete safeMetadata.email;
+      delete safeMetadata.phone;
+
       await supabase.from('events').insert({
         anonymous_id: sessionId,
         event_name: eventName,
-        source: metadata.source || null,
-        squad_id: metadata.squadId || null,
-        campus: metadata.campus || null,
-        user_id: metadata.userId || null,
-        referrer_user_id: metadata.referrerId || null,
-        metadata: metadata
+        source: safeMetadata.source || null,
+        squad_id: safeMetadata.squadId || null,
+        campus: safeMetadata.campus || null,
+        user_id: safeMetadata.userId || null,
+        referrer_user_id: safeMetadata.referrerId || null,
+        metadata: safeMetadata
       });
     } catch (e) {
       console.error('Failed to track event to Supabase', e);

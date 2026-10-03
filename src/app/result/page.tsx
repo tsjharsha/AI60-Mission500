@@ -124,10 +124,10 @@ export default function ResultPage() {
               {!interviewAnswer ? (
                 <div className="flex flex-col gap-3">
                   <button 
-                    onClick={() => handleInterviewAnswer('I already have a project')}
+                    onClick={() => handleInterviewAnswer('I already have something strong to show')}
                     className="p-4 rounded-xl border border-zinc-800 hover:bg-zinc-900 transition-colors"
                   >
-                    I already have a project
+                    I already have something strong to show
                   </button>
                   <button 
                     onClick={() => handleInterviewAnswer("I don't have anything to show")}
@@ -138,9 +138,9 @@ export default function ResultPage() {
                 </div>
               ) : (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  {interviewAnswer === 'I already have a project' ? (
+                  {interviewAnswer === 'I already have something strong to show' ? (
                     <p className="text-lg text-white font-semibold mb-6">
-                      Good. Then your next advantage is building something closer to the role you actually want.
+                      Good. Your next advantage is building something closer to the role you actually want.
                     </p>
                   ) : (
                     <p className="text-lg text-white font-semibold mb-6">
