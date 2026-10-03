@@ -1,11 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ShieldAlert, Users, MousePointerClick, RefreshCw, Share2, Sparkles, TrendingUp } from 'lucide-react';
+import { ShieldAlert, Users, MousePointerClick, RefreshCw, Share2, Sparkles, TrendingUp, RotateCcw } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useAppStore } from '@/store/useAppStore';
+import { isSupabaseConfigured } from '@/lib/supabase/client';
 
 export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
+  const resetStore = useAppStore(state => state.reset);
 
   useEffect(() => {
     setMounted(true);
@@ -13,24 +16,44 @@ export default function AdminDashboard() {
 
   if (!mounted) return null;
 
+  const handleReset = () => {
+    resetStore();
+    window.location.href = '/';
+  };
+
+  const isLive = isSupabaseConfigured;
+
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-zinc-300 p-6 font-mono">
       <div className="max-w-6xl mx-auto w-full pt-8">
-        <div className="flex items-center justify-between mb-12 border-b border-zinc-800 pb-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12 border-b border-zinc-800 pb-6 gap-4">
           <div className="flex items-center gap-3">
             <ShieldAlert className="text-red-500 w-8 h-8" />
             <h1 className="text-2xl font-bold text-white tracking-widest">GROWTH COMMAND CENTER</h1>
           </div>
-          <div className="flex items-center gap-2 text-xs bg-red-950/30 text-red-400 px-3 py-1 border border-red-900/50 rounded">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            LIVE EXPERIMENT
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handleReset}
+              className="flex items-center gap-2 text-xs bg-zinc-900 text-zinc-400 px-3 py-1.5 border border-zinc-800 rounded hover:bg-zinc-800 hover:text-white transition-colors"
+            >
+              <RotateCcw size={14} /> RESET DEMO SESSION
+            </button>
+            <div className={`flex items-center gap-2 text-xs px-3 py-1.5 border rounded ${isLive ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-red-950/30 text-red-400 border-red-900/50'}`}>
+              <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              {isLive ? 'REAL CAMPAIGN DATA' : 'DEMO SIMULATION'}
+            </div>
           </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           {/* Funnel */}
           <div className="lg:col-span-2 bg-[#111] border border-zinc-800 p-6 rounded-xl">
-            <h2 className="text-sm text-zinc-500 mb-6 flex items-center gap-2"><TrendingUp size={16}/> ACQUISITION FUNNEL</h2>
+            <h2 className="text-sm text-zinc-500 mb-6 flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2"><TrendingUp size={16}/> ACQUISITION FUNNEL</div>
+              <span className="text-[10px] bg-zinc-900 px-2 py-0.5 rounded text-zinc-600">
+                {!isLive && "Simulation dataset + live demo events"}
+              </span>
+            </h2>
             
             <div className="space-y-4">
               {[
@@ -62,18 +85,22 @@ export default function AdminDashboard() {
 
           {/* Core Metrics */}
           <div className="flex flex-col gap-6">
-            <div className="bg-[#111] border border-zinc-800 p-6 rounded-xl flex-1 flex flex-col justify-center">
+            <div className="bg-[#111] border border-zinc-800 p-6 rounded-xl flex-1 flex flex-col justify-center relative group">
               <p className="text-xs text-zinc-500 mb-1">VIRAL K-FACTOR</p>
               <p className="text-5xl font-bold text-white mb-2">1.24</p>
               <p className="text-xs text-green-500 bg-green-500/10 px-2 py-1 inline-block rounded self-start border border-green-500/20">
                 +0.15 since yesterday
               </p>
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-black text-[10px] p-2 rounded border border-zinc-700 transition-opacity z-10 w-48">
+                Avg Invites per User (4.27) × Invite Conversion (29%)
+              </div>
             </div>
             
             <div className="bg-[#111] border border-zinc-800 p-6 rounded-xl flex-1 flex flex-col justify-center">
               <p className="text-xs text-zinc-500 mb-1">CPA (COST PER ACQUISITION)</p>
               <p className="text-5xl font-bold text-white mb-2">₹3.80</p>
               <p className="text-xs text-zinc-400">Budget used: ₹1,246 / ₹2,000</p>
+              {!isLive && <p className="text-[10px] text-zinc-600 mt-2">SIMULATED</p>}
             </div>
           </div>
         </div>
@@ -83,7 +110,7 @@ export default function AdminDashboard() {
           <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/10 blur-[50px] rounded-full" />
           
           <h2 className="text-sm text-blue-400 mb-6 flex items-center gap-2">
-            <Sparkles size={16}/> AI GROWTH COPILOT INSIGHTS
+            <Sparkles size={16}/> {process.env.NEXT_PUBLIC_GEMINI_API_KEY ? 'AI GROWTH COPILOT INSIGHTS' : 'AUTOMATED GROWTH ANALYSIS'}
           </h2>
 
           <div className="grid md:grid-cols-2 gap-4 mb-6">

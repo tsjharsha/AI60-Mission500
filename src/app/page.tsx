@@ -1,18 +1,29 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { trackEvent } from '@/lib/analytics/trackEvent';
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
-  const { registration } = useAppStore();
+  const { setReferralContext } = useAppStore();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    const source = searchParams.get('source') || undefined;
+    const squad = searchParams.get('squad') || undefined;
+    const ref = searchParams.get('ref') || undefined;
+    
+    if (source || squad || ref) {
+      setReferralContext({ source, squadCode: squad, referrerId: ref });
+    }
+    
+    trackEvent('landing_view', { source, squad, ref });
+  }, [searchParams, setReferralContext]);
 
   if (!mounted) return null;
 
@@ -63,5 +74,13 @@ export default function Home() {
         MISSION 500 &copy; 2026 NxtWave
       </footer>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <HomeContent />
+    </Suspense>
   );
 }

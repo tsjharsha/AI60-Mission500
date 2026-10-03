@@ -1,13 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
+import { useState, useEffect } from 'react';
+import { ShieldCheck, Mail, Phone, ArrowRight } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics/trackEvent';
+import { registerUser, createSquad } from '@/lib/supabase/services';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { profile, projectResult, registration, completeRegistration } = useAppStore();
+  const { profile, projectResult, referralContext, completeRegistration, registration, setCurrentSquad } = useAppStore();
+  
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -15,46 +19,78 @@ export default function RegisterPage() {
 
   useEffect(() => {
     setMounted(true);
-    if (!projectResult) router.push('/');
-  }, [projectResult, router]);
+    if (!profile || !projectResult) {
+      router.push('/diagnostic');
+    } else {
+      trackEvent('registration_started', { source: referralContext.source });
+    }
+  }, [profile, projectResult, router, referralContext.source]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !phone) return;
+    
     setIsSubmitting(true);
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 1000));
-    completeRegistration();
-    setIsSubmitting(false);
+    
+    try {
+      // 1. Register User
+      const { userId, builderNumber } = await registerUser(
+        { ...profile, email, phone },
+        referralContext,
+        projectResult
+      );
+      
+      completeRegistration(userId, builderNumber);
+      trackEvent('registration_completed', { builderNumber });
+      
+      // 2. Create Squad if not joining one
+      if (!referralContext.squadCode) {
+        const squad = await createSquad(userId, projectResult?.project?.name || 'AI Project');
+        setCurrentSquad(squad.id, squad.code);
+        trackEvent('squad_created', { squadCode: squad.code });
+      } else {
+        // If they joined via invite, we set the squad from context
+        setCurrentSquad(referralContext.squadCode, referralContext.squadCode);
+        trackEvent('squad_joined', { squadCode: referralContext.squadCode });
+      }
+
+      // Simulate a small delay for dramatic effect
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error(error);
+      setIsSubmitting(false);
+    }
   };
 
-  if (!mounted || !projectResult) return null;
+  if (!mounted || !profile || !projectResult) return null;
 
   if (registration.registered) {
     return (
-      <div className="flex flex-col min-h-screen bg-black text-white items-center justify-center p-6 text-center">
+      <div className="flex flex-col min-h-screen bg-black text-white items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-black to-black" />
+        
         <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="max-w-md w-full"
+          className="text-center z-10"
         >
-          <p className="text-zinc-400 font-mono mb-4 tracking-widest">MISSION ACCEPTED</p>
-          <h2 className="text-4xl font-bold mb-8 text-gradient">YOU ARE BUILDER #{registration.builderNumber}</h2>
-          
-          <div className="space-y-4 mb-12">
-            <p className="text-xl text-zinc-300">
-              <span className="text-white font-bold">172</span> builders remaining.
-            </p>
-            <p className="text-xl text-zinc-300">
-              Your campus now has <span className="text-white font-bold">38</span> builders.
-            </p>
+          <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-8 border border-blue-500/30">
+            <ShieldCheck className="text-blue-500 w-10 h-10" />
           </div>
-
+          
+          <p className="text-zinc-400 font-mono mb-4 tracking-widest text-sm">MISSION SECURED</p>
+          <h1 className="text-5xl md:text-7xl font-bold mb-2">BUILDER #{registration.builderNumber}</h1>
+          <p className="text-xl text-zinc-300 mb-12">Your spot is confirmed.</p>
+          
           <button 
             onClick={() => router.push('/squad')}
-            className="glow-button w-full py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-[1.02] transition-transform"
+            className="glow-button px-12 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-[1.02] transition-transform flex items-center gap-2 mx-auto"
           >
-            Form Your Squad
+            Enter Command Center <ArrowRight size={20} />
           </button>
         </motion.div>
       </div>
@@ -62,52 +98,47 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-black text-white items-center justify-center p-6">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full"
-      >
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold mb-2">Claim Your Build Slot</h2>
-          <p className="text-zinc-400">Join the free 60-minute workshop to build {projectResult.project.name}.</p>
-        </div>
-
+    <div className="flex flex-col min-h-screen bg-black text-white p-6 items-center">
+      <div className="max-w-md w-full mt-24">
+        <h1 className="text-4xl font-bold mb-2 text-center">Secure Your Spot</h1>
+        <p className="text-zinc-400 mb-8 text-center">
+          Join the 60-minute workshop to build your <span className="text-white">Project DNA</span> live.
+        </p>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-mono text-zinc-500 mb-2">EMAIL ADDRESS</label>
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
             <input 
-              required
               type="email" 
-              placeholder="name@college.edu" 
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white outline-none focus:border-white transition-colors"
+              placeholder="Email Address" 
+              required
               value={email}
               onChange={e => setEmail(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors"
             />
           </div>
-          <div>
-            <label className="block text-sm font-mono text-zinc-500 mb-2">WHATSAPP NUMBER</label>
+          
+          <div className="relative">
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
             <input 
-              required
               type="tel" 
-              placeholder="+91" 
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white outline-none focus:border-white transition-colors"
+              placeholder="WhatsApp Number" 
+              required
               value={phone}
               onChange={e => setPhone(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors"
             />
           </div>
-
+          
           <button 
-            disabled={isSubmitting}
             type="submit"
-            className="glow-button w-full py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-[1.02] transition-transform disabled:opacity-50 mt-4 flex justify-center items-center gap-2"
+            disabled={isSubmitting}
+            className="w-full py-4 mt-4 bg-white text-black rounded-xl font-bold text-lg hover:bg-zinc-200 transition-colors disabled:opacity-50"
           >
-            {isSubmitting ? (
-              <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-            ) : "Claim My Build Slot"}
+            {isSubmitting ? 'Securing Spot...' : 'Claim My Builder Number'}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }

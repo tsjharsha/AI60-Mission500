@@ -1,36 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { generateDeterministicProject } from '@/utils/aiGenerator';
+import { generateProjectDNA } from '@/lib/project-dna/generateProjectDNA';
 import { Check, ChevronRight } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics/trackEvent';
 
-const BRANCHES = ['Computer Science', 'AI / ML', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Biotechnology', 'Other'];
+const BRANCHES = ['Computer Science', 'AI / ML', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Biotechnology', 'Cybersecurity', 'Other'];
 const ROLES = ['Software Engineer', 'Backend Engineer', 'Frontend Engineer', 'Data Analyst', 'Data Scientist', 'AI / ML Engineer', 'Product / Tech', 'Cybersecurity', 'Core Engineering', 'Other'];
 const SKILLS = ['Python', 'Java', 'C++', 'JavaScript', 'React', 'SQL', 'Machine Learning', 'Data Structures', 'Cloud', 'Git', 'APIs'];
 
 export default function DiagnosticPage() {
   const router = useRouter();
-  const { setProfile, setProjectResult, profile } = useAppStore();
+  const { setProfile, setProjectResult, profile, referralContext } = useAppStore();
   
   const [step, setStep] = useState(1);
   const [localData, setLocalData] = useState({
     name: profile.name || '',
     college: profile.college || '',
     branch: profile.branch || '',
-    graduationYear: profile.graduationYear || '2025',
+    graduationYear: profile.graduationYear || '2026',
     targetRole: profile.targetRole || '',
     skills: profile.skills || [],
     aiExperience: profile.aiExperience || '',
+    placementConfidence: profile.placementConfidence || ''
   });
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisText, setAnalysisText] = useState('Analyzing technical profile...');
 
+  useEffect(() => {
+    trackEvent('diagnostic_started', { source: referralContext.source });
+  }, [referralContext.source]);
+
   const handleNext = () => {
-    if (step < 5) {
+    trackEvent('diagnostic_step_completed', { step, ...localData });
+    if (step < 6) {
       setStep(step + 1);
     } else {
       handleComplete();
@@ -38,10 +45,10 @@ export default function DiagnosticPage() {
   };
 
   const handleComplete = async () => {
+    trackEvent('diagnostic_completed', { ...localData });
     setProfile(localData);
     setIsAnalyzing(true);
     
-    // Simulate AI generation stages
     const stages = [
       'Mapping placement readiness...',
       'Finding missing AI proof...',
@@ -49,16 +56,25 @@ export default function DiagnosticPage() {
       'Building your Project DNA...'
     ];
     
+    const minTimePerStage = 600;
+    
+    // Start AI generation in background
+    const generationPromise = generateProjectDNA(localData);
+    
     for (let i = 0; i < stages.length; i++) {
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, minTimePerStage));
       setAnalysisText(stages[i]);
     }
     
-    await new Promise(r => setTimeout(r, 600));
-    
-    const result = generateDeterministicProject(localData);
-    setProjectResult(result);
-    router.push('/result');
+    try {
+      const result = await generationPromise;
+      trackEvent('project_generated', { projectName: result.project.name, archetype: result.archetype });
+      setProjectResult(result);
+      router.push('/result');
+    } catch (e) {
+      console.error(e);
+      // In a real app we'd show an error or fallback, but generateProjectDNA already has a fallback
+    }
   };
 
   const toggleSkill = (skill: string) => {
@@ -107,12 +123,12 @@ export default function DiagnosticPage() {
     <div className="flex flex-col min-h-screen bg-black text-white p-6 relative">
       <div className="max-w-2xl mx-auto w-full pt-12">
         <div className="mb-8">
-          <p className="text-zinc-500 text-sm font-mono mb-2">STEP {step} OF 5</p>
+          <p className="text-zinc-500 text-sm font-mono mb-2">STEP {step} OF 6</p>
           <div className="w-full bg-zinc-900 h-1 rounded-full overflow-hidden">
             <motion.div 
               className="bg-white h-full"
-              initial={{ width: `${((step - 1) / 5) * 100}%` }}
-              animate={{ width: `${(step / 5) * 100}%` }}
+              initial={{ width: `${((step - 1) / 6) * 100}%` }}
+              animate={{ width: `${(step / 6) * 100}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>
@@ -208,6 +224,27 @@ export default function DiagnosticPage() {
               </div>
             </motion.div>
           )}
+
+          {step === 6 && (
+            <motion.div key="step6" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+              <h2 className="text-3xl font-semibold leading-tight">If an interviewer asked you right now:<br/><span className="text-zinc-400">"Show me something useful you've built using AI."</span><br/>What would happen?</h2>
+              <div className="flex flex-col gap-4 mt-8">
+                {[
+                  "I have something strong to show", 
+                  "I've experimented, but nothing impressive", 
+                  "I wouldn't have anything to show"
+                ].map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setLocalData({...localData, placementConfidence: level})}
+                    className={`p-5 rounded-xl border text-left transition-all ${localData.placementConfidence === level ? 'border-white bg-white/10' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'}`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         <div className="mt-12 flex justify-between">
@@ -224,7 +261,7 @@ export default function DiagnosticPage() {
             onClick={handleNext}
             className="flex items-center gap-2 px-8 py-3 bg-white text-black rounded-full font-semibold hover:bg-zinc-200 transition-colors"
           >
-            {step === 5 ? 'Analyze Profile' : 'Next'}
+            {step === 6 ? 'Analyze Profile' : 'Next'}
             <ChevronRight size={18} />
           </button>
         </div>

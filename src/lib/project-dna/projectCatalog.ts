@@ -1,0 +1,102 @@
+import { ProjectCatalogEntry } from './types';
+
+export const CATALOG: ProjectCatalogEntry[] = [
+  {
+    id: "ai-sql-debugger",
+    name: "AI SQL Debugging Copilot",
+    description: "Build an AI assistant that identifies SQL syntax issues, explains schema errors, and generates corrected queries.",
+    whyItFitsTemplate: "You already have backend skills. This adds the applied AI signal recruiters want for software engineers.",
+    domains: ["software", "backend", "data"],
+    branches: ["Computer Science", "IT", "AI / ML"],
+    roles: ["Backend Engineer", "Software Engineer", "Data Analyst"],
+    requiredSkills: ["SQL"],
+    optionalSkills: ["Python", "APIs"],
+    squadRole: "BUILDER",
+    estimatedMinutes: 52,
+    difficulty: "Beginner-friendly"
+  },
+  {
+    id: "ai-code-reviewer",
+    name: "Automated PR Reviewer",
+    description: "An AI tool that reads git diffs and automatically comments on security vulnerabilities and code smells.",
+    whyItFitsTemplate: "Software engineers need to ship secure code. Showing you can automate code reviews proves you understand the entire software lifecycle.",
+    domains: ["software", "backend", "frontend"],
+    branches: ["Computer Science", "IT", "Other"],
+    roles: ["Software Engineer", "Frontend Engineer", "Backend Engineer", "Cybersecurity"],
+    requiredSkills: ["Git"],
+    optionalSkills: ["JavaScript", "Python", "React"],
+    squadRole: "SHIPPER",
+    estimatedMinutes: 58,
+    difficulty: "Intermediate"
+  },
+  {
+    id: "ai-dataset-insight",
+    name: "AI Dataset Insight Generator",
+    description: "An AI tool that ingests CSV files and generates an executive summary of hidden data trends and anomalies.",
+    whyItFitsTemplate: "Data roles require making sense of noise. This proves you can use LLMs to scale data analysis.",
+    domains: ["data", "ml"],
+    branches: ["AI / ML", "Computer Science", "IT"],
+    roles: ["Data Analyst", "Data Scientist", "AI / ML Engineer"],
+    requiredSkills: ["Python"],
+    optionalSkills: ["Machine Learning"],
+    squadRole: "SOLVER",
+    estimatedMinutes: 55,
+    difficulty: "Intermediate"
+  },
+  {
+    id: "ai-circuit-troubleshooter",
+    name: "AI Circuit Diagnostic Assistant",
+    description: "An AI assistant that diagnoses circuit design flaws based on input parameters and component specifications.",
+    whyItFitsTemplate: "Core engineering is becoming software-defined. Showing AI applied to hardware makes your ECE profile stand out.",
+    domains: ["hardware", "core"],
+    branches: ["ECE", "EEE"],
+    roles: ["Core Engineering", "Hardware Engineer", "Software Engineer"],
+    requiredSkills: [],
+    optionalSkills: ["Python", "C++"],
+    squadRole: "SOLVER",
+    estimatedMinutes: 60,
+    difficulty: "Beginner-friendly"
+  },
+  {
+    id: "ai-predictive-maintenance",
+    name: "Predictive Maintenance Log Analyzer",
+    description: "An AI script that reads machine sensor logs and predicts which parts need maintenance before they fail.",
+    whyItFitsTemplate: "Mechanical engineering is merging with IoT. This project proves you can bridge physical systems with AI intelligence.",
+    domains: ["core", "mechanical"],
+    branches: ["Mechanical", "Civil"],
+    roles: ["Core Engineering", "Data Analyst"],
+    requiredSkills: [],
+    optionalSkills: ["Python", "Data Structures"],
+    squadRole: "BUILDER",
+    estimatedMinutes: 45,
+    difficulty: "Beginner-friendly"
+  },
+  {
+    id: "ai-bio-paper-mapper",
+    name: "Research Paper Insight Extractor",
+    description: "An AI pipeline that reads biotechnology abstracts and extracts gene-disease relationships automatically.",
+    whyItFitsTemplate: "Biotech relies heavily on literature. Automating research extraction shows you can accelerate R&D.",
+    domains: ["biotech", "research"],
+    branches: ["Biotechnology", "Other"],
+    roles: ["Data Analyst", "Other"],
+    requiredSkills: [],
+    optionalSkills: ["Python", "APIs"],
+    squadRole: "SOLVER",
+    estimatedMinutes: 50,
+    difficulty: "Intermediate"
+  },
+  {
+    id: "ai-feature-roadmap",
+    name: "AI User Feedback Synthesizer",
+    description: "An AI app that clusters raw user feedback into a prioritized product roadmap.",
+    whyItFitsTemplate: "Product roles require prioritizing chaos. This shows you can use AI to make data-driven product decisions.",
+    domains: ["product"],
+    branches: ["Computer Science", "IT", "Other"],
+    roles: ["Product / Tech", "Software Engineer"],
+    requiredSkills: [],
+    optionalSkills: ["React", "JavaScript", "APIs"],
+    squadRole: "SHIPPER",
+    estimatedMinutes: 48,
+    difficulty: "Beginner-friendly"
+  }
+];

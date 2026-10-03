@@ -27,8 +27,11 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-4xl w-full mt-12 relative z-10"
       >
-        <div className="text-center mb-16">
-          <p className="text-red-500 font-mono text-sm mb-4 tracking-[0.3em]">LIVE DASHBOARD</p>
+        <div className="text-center mb-16 relative">
+          <div className="inline-flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <p className="text-red-500 font-mono text-sm tracking-[0.3em]">MISSION SIMULATION</p>
+          </div>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-4 uppercase">MISSION 500</h1>
           <p className="text-xl text-zinc-400 font-light">500 final-year engineers. One AI build movement.</p>
         </div>
@@ -62,7 +65,7 @@ export default function DashboardPage() {
           <div className="border border-zinc-800 bg-zinc-900/50 rounded-3xl p-8">
             <h3 className="text-xl font-bold mb-6 flex items-center justify-between">
               Top Campuses
-              <span className="text-xs font-mono text-zinc-500 font-normal">LIVE</span>
+              <span className="text-xs font-mono text-zinc-500 font-normal">SIMULATED</span>
             </h3>
             
             <div className="space-y-4">
@@ -93,7 +96,7 @@ export default function DashboardPage() {
           <div className="border border-zinc-800 bg-zinc-900/50 rounded-3xl p-8">
             <h3 className="text-xl font-bold mb-6 flex items-center justify-between">
               Project DNA Distribution
-              <span className="text-xs font-mono text-zinc-500 font-normal">NATIONWIDE</span>
+              <span className="text-xs font-mono text-zinc-500 font-normal">SIMULATED</span>
             </h3>
             
             <div className="space-y-4">

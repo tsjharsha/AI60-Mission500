@@ -4,20 +4,28 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useState, useEffect } from 'react';
+import { trackEvent } from '@/lib/analytics/trackEvent';
 
 export default function ResultPage() {
   const router = useRouter();
   const { profile, projectResult } = useAppStore();
   const [showInterview, setShowInterview] = useState(false);
-  const [interviewAnswered, setInterviewAnswered] = useState(false);
+  const [interviewAnswer, setInterviewAnswer] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     if (!projectResult) {
       router.push('/diagnostic');
+    } else {
+      trackEvent('result_viewed', { archetype: projectResult.archetype });
     }
   }, [projectResult, router]);
+
+  const handleInterviewAnswer = (answer: string) => {
+    setInterviewAnswer(answer);
+    trackEvent('interview_answered', { answer });
+  };
 
   if (!mounted || !projectResult) return null;
 
@@ -37,7 +45,8 @@ export default function ResultPage() {
           <div className="flex justify-between items-start mb-8 relative z-10">
             <div>
               <h2 className="text-3xl font-bold uppercase tracking-wider mb-1">{profile.name || 'Builder'}</h2>
-              <p className="text-zinc-400 font-mono">{projectResult.archetype}</p>
+              <p className="text-zinc-400 font-mono mb-2">{projectResult.archetype}</p>
+              <p className="text-sm text-zinc-500 italic max-w-[200px]">{projectResult.archetypeDescription}</p>
             </div>
             <div className="text-right">
               <p className="text-4xl font-bold text-white">{projectResult.aiReadinessScore}%</p>
@@ -67,7 +76,11 @@ export default function ResultPage() {
           <p className="text-center text-zinc-400 font-mono text-sm mb-6">YOUR 60-MINUTE AI PROJECT</p>
           <div className="border border-zinc-800 bg-zinc-900/50 rounded-2xl p-8">
             <h3 className="text-2xl font-bold mb-4">{projectResult.project.name}</h3>
-            <p className="text-zinc-400 mb-6">{projectResult.project.description}</p>
+            <p className="text-zinc-400 mb-4">{projectResult.project.description}</p>
+            <div className="p-3 bg-blue-900/20 border border-blue-500/20 rounded-lg mb-6">
+              <p className="text-xs text-blue-400 font-mono mb-1">WHY IT FITS</p>
+              <p className="text-sm text-zinc-300">{projectResult.project.whyItFits}</p>
+            </div>
             
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
@@ -108,16 +121,16 @@ export default function ResultPage() {
                 "Tell me about something you’ve built using AI."
               </p>
               
-              {!interviewAnswered ? (
+              {!interviewAnswer ? (
                 <div className="flex flex-col gap-3">
                   <button 
-                    onClick={() => setInterviewAnswered(true)}
+                    onClick={() => handleInterviewAnswer('I already have a project')}
                     className="p-4 rounded-xl border border-zinc-800 hover:bg-zinc-900 transition-colors"
                   >
                     I already have a project
                   </button>
                   <button 
-                    onClick={() => setInterviewAnswered(true)}
+                    onClick={() => handleInterviewAnswer("I don't have anything to show")}
                     className="p-4 rounded-xl border border-zinc-800 hover:bg-zinc-900 transition-colors"
                   >
                     I don't have anything to show
@@ -125,9 +138,15 @@ export default function ResultPage() {
                 </div>
               ) : (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <p className="text-lg text-white font-semibold mb-6">
-                    That's the gap we're fixing.
-                  </p>
+                  {interviewAnswer === 'I already have a project' ? (
+                    <p className="text-lg text-white font-semibold mb-6">
+                      Good. Then your next advantage is building something closer to the role you actually want.
+                    </p>
+                  ) : (
+                    <p className="text-lg text-white font-semibold mb-6">
+                      That's the gap we're fixing.
+                    </p>
+                  )}
                   <button 
                     onClick={() => router.push('/register')}
                     className="glow-button w-full py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-[1.02] transition-transform"
