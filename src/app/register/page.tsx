@@ -1,27 +1,28 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useState, useEffect } from 'react';
-import { ShieldCheck, Mail, Phone, Lock, ArrowRight, Fingerprint } from 'lucide-react';
+import { ShieldCheck, Mail, Phone, ArrowRight, Fingerprint } from 'lucide-react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
 import { registerUser, createSquad, joinSquad } from '@/lib/supabase/services';
 import { Button } from '@/components/ui/Button';
+import { useClientReady } from '@/lib/useClientReady';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const { profile, projectResult, referralContext, completeRegistration, registration, setCurrentSquad } = useAppStore();
   
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientReady();
   const [revealPhase, setRevealPhase] = useState(0); // 0: Form, 1: Generating, 2: Reveal
 
   useEffect(() => {
-    setMounted(true);
     if (!profile || !projectResult) {
       router.push('/diagnostic');
     } else {
@@ -112,10 +113,10 @@ export default function RegisterPage() {
       completeRegistration(userId, builderNumber);
       trackEvent('registration_completed', { builderNumber });
 
-      // Add a slight dramatic delay before showing the final result
+      // Keep the real assignment visible only after the request succeeds.
       setTimeout(() => {
         setRevealPhase(2);
-      }, 1500);
+      }, reduceMotion ? 0 : 1100);
       
     } catch (err) {
       console.error(err);
@@ -128,7 +129,7 @@ export default function RegisterPage() {
   if (!mounted || !profile || !projectResult) return null;
 
   // Reveal Phase 2: Success
-  if (registration.registered || revealPhase === 2) {
+  if ((registration.registered || revealPhase === 2) && revealPhase !== 1) {
     return (
       <div className="flex flex-col min-h-[100dvh] bg-background text-foreground items-center justify-center p-6 relative overflow-hidden">
         {/* Deep cinematic background for reveal */}
@@ -136,20 +137,20 @@ export default function RegisterPage() {
         <motion.div 
           className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-accent/30 via-black to-black opacity-0"
           animate={{ opacity: 1 }}
-          transition={{ duration: 1.5 }}
+          transition={{ duration: reduceMotion ? 0 : 1.5 }}
         />
         <div className="absolute inset-0 bg-grid-pattern opacity-10 z-0 pointer-events-none" />
         
         <motion.div 
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, type: "spring" }}
+            transition={{ duration: reduceMotion ? 0 : 0.8, delay: reduceMotion ? 0 : 0.2, type: "spring" }}
           className="text-center z-10 max-w-2xl w-full"
         >
           <motion.div 
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.5, type: "spring" }}
+            transition={{ duration: reduceMotion ? 0 : 0.5, delay: reduceMotion ? 0 : 0.5, type: "spring" }}
             className="w-24 h-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-8 border border-accent/40 shadow-[0_0_50px_rgba(59,130,246,0.3)] relative"
           >
             <div className="absolute inset-0 rounded-full border border-accent/60 animate-ping opacity-20" />
@@ -157,22 +158,28 @@ export default function RegisterPage() {
           </motion.div>
           
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.8 }}
           >
-            <p className="text-muted font-mono mb-4 tracking-[0.3em] text-sm uppercase">Mission Secured</p>
-            <h1 className="text-6xl md:text-8xl font-bold mb-4 tracking-tighter text-white">
+            <p className="text-accent font-mono mb-4 tracking-[0.3em] text-xs uppercase">Identity assigned / Mission 500</p>
+            <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tighter text-white">
               BUILDER <span className="text-accent">#{registration.builderNumber}</span>
             </h1>
-            <p className="text-xl text-zinc-400 mb-12 font-light">Your project DNA has been synchronized.</p>
+            <p className="text-lg text-zinc-400 mb-8 font-light">Welcome to the build, {profile.name || 'builder'}.</p>
+            <div className="mx-auto mb-9 grid max-w-lg grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-left">
+              <div className="bg-[#10151d] p-5"><p className="eyebrow mb-2">YOUR PROJECT DNA</p><p className="font-semibold">{projectResult.archetype}</p></div>
+              <div className="bg-[#10151d] p-5"><p className="eyebrow mb-2">SQUAD ROLE</p><p className="font-semibold">{projectResult.squadRole}</p></div>
+            </div>
+            <p className="mb-3 font-mono text-[11px] tracking-widest text-muted">YOUR BUILD PLAN</p>
+            <p className="mx-auto mb-9 max-w-md text-lg text-white">{projectResult.project.name}</p>
             
             <Button 
               size="lg"
               onClick={() => router.push('/squad')}
               className="px-10 gap-3 shadow-[0_0_40px_rgba(59,130,246,0.4)]"
             >
-              ENTER COMMAND CENTER <ArrowRight size={20} />
+              MEET MY SQUAD <ArrowRight size={20} />
             </Button>
           </motion.div>
         </motion.div>
@@ -187,16 +194,16 @@ export default function RegisterPage() {
         <div className="absolute inset-0 bg-grid-pattern opacity-5 z-0" />
         <div className="z-10 flex flex-col items-center">
           <motion.div 
-            animate={{ rotate: 360 }}
+            animate={reduceMotion ? undefined : { rotate: 360 }}
             transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
             className="w-20 h-20 border-t-2 border-accent border-r-2 rounded-full mb-8 opacity-80"
           />
           <motion.p 
-            initial={{ opacity: 0 }}
+            initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             className="font-mono tracking-widest text-accent uppercase text-sm animate-pulse"
           >
-            Encrypting Builder Identity...
+            Assigning your Builder Number...
           </motion.p>
         </div>
       </div>
@@ -212,17 +219,17 @@ export default function RegisterPage() {
       <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
 
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full relative z-10"
       >
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-muted-bg/50 border border-border mb-6">
-            <Lock className="text-muted w-6 h-6" />
+            <Fingerprint className="text-accent w-6 h-6" />
           </div>
-          <h1 className="text-4xl font-bold mb-3 tracking-tight">Secure Your Identity</h1>
+          <h1 className="text-4xl font-bold mb-3 tracking-tight">Claim your Builder Number</h1>
           <p className="text-muted leading-relaxed">
-            Register to lock in your Project DNA and access the command center.
+            Join the 60-minute build with {projectResult.project.name}. Your squad comes next.
           </p>
         </div>
         
@@ -263,11 +270,11 @@ export default function RegisterPage() {
             className="w-full py-6 mt-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] gap-2 group"
           >
             <Fingerprint className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" />
-            SECURE BUILDER IDENTITY
+            CLAIM MY BUILDER NUMBER
           </Button>
 
           <p className="text-center text-[10px] font-mono text-muted/60 mt-4 uppercase tracking-wider">
-            End-to-End Encrypted Handshake
+            Your details are used for workshop registration.
           </p>
         </form>
       </motion.div>

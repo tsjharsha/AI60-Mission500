@@ -2,21 +2,24 @@
 
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { Share2, Copy, CheckCircle2, Users, AlertCircle, Share, ExternalLink } from 'lucide-react';
+import { Share2, Copy, CheckCircle2, Users, AlertCircle, ExternalLink, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { trackEvent } from '@/lib/analytics/trackEvent';
 import { Button } from '@/components/ui/Button';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useClientReady } from '@/lib/useClientReady';
 
 export default function SquadPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const { currentSquad, profile, projectResult, registration } = useAppStore();
   const [copied, setCopied] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [squadMembers, setSquadMembers] = useState<any[]>([{ role: projectResult?.squadRole || 'BUILDER', name: profile.name || 'You' }]);
+  const [copyError, setCopyError] = useState(false);
+  const mounted = useClientReady();
+  const [loadedMembers, setLoadedMembers] = useState<{ role: string; name: string }[] | null>(null);
+  const squadMembers = loadedMembers ?? [{ role: projectResult?.squadRole || 'BUILDER', name: profile.name || 'You' }];
 
   useEffect(() => {
-    setMounted(true);
     if (!registration.registered) {
       router.push('/register');
       return;
@@ -29,7 +32,7 @@ export default function SquadPage() {
         .then(res => res.json())
         .then(data => {
           if (data && data.members) {
-            setSquadMembers(data.members);
+            setLoadedMembers(data.members);
           }
         })
         .catch(console.error);
@@ -46,6 +49,7 @@ export default function SquadPage() {
   const occupiedRoles = squadMembers.map(m => m.role);
   const missingRoles = allRoles.filter(r => !occupiedRoles.includes(r));
   const isComplete = missingRoles.length === 0;
+  const filledCount = allRoles.length - missingRoles.length;
   
   const neededText = !isComplete 
     ? `and still need a ${missingRoles.join(' + ')}.` 
@@ -53,11 +57,17 @@ export default function SquadPage() {
     
   const getShareText = (source: string) => `I got assigned ${projectResult?.squadRole} in NxtWave AI60. We're building ${projectResult?.project?.name} ${neededText} Discover your Project DNA and join my squad: ${getShareUrl(source)}`;
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(getShareUrl('copy'));
-    setCopied(true);
-    trackEvent('squad_invite_shared', { method: 'copy', squadCode: currentSquad.code });
-    setTimeout(() => setCopied(false), 2000);
+  const copyLink = async () => {
+    setCopyError(false);
+    try {
+      await navigator.clipboard.writeText(getShareUrl('copy'));
+      setCopied(true);
+      trackEvent('squad_invite_shared', { method: 'copy', squadCode: currentSquad.code });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      setCopyError(true);
+    }
   };
   
   const shareWhatsApp = () => {
@@ -98,7 +108,7 @@ export default function SquadPage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <Users className="text-muted" size={20} />
-              <h1 className="text-sm font-mono tracking-widest text-muted uppercase">Command Center</h1>
+              <h1 className="text-sm font-mono tracking-widest text-muted uppercase">Squad Formation / Mission 500</h1>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
               Squad <span className={isComplete ? "text-success" : "text-accent"}>{currentSquad.code}</span>
@@ -108,7 +118,7 @@ export default function SquadPage() {
             <div className="text-right hidden sm:block">
               <p className="text-[10px] font-mono tracking-[0.2em] text-muted uppercase mb-1">Squad Status</p>
               <p className={`font-mono font-bold text-lg ${isComplete ? 'text-success' : 'text-white'}`}>
-                {squadMembers.length} / 3 ASSEMBLED
+                {filledCount} / 3 ASSEMBLED
               </p>
             </div>
             <Button 
@@ -125,10 +135,11 @@ export default function SquadPage() {
         <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-8 lg:gap-12 flex-1">
           {/* Squad Roster */}
           <div className="flex flex-col gap-4">
-            <h3 className="font-mono text-xs tracking-widest text-muted uppercase mb-2">Mission Roster</h3>
+            <h3 className="font-mono text-xs tracking-widest text-muted uppercase mb-2">Three roles. One build.</h3>
             
-            <div className={`flex flex-col gap-3 p-6 rounded-2xl border transition-colors duration-700 ${isComplete ? 'bg-success/5 border-success/30' : 'bg-muted-bg/30 border-border'}`}>
-              <AnimatePresence>
+            <div className={`relative flex flex-col gap-0 overflow-hidden rounded-[28px] border transition-colors duration-700 ${isComplete ? 'bg-success/5 border-success/30' : 'bg-[#10141d] border-accent/25'}`}>
+              <div className="flex items-center justify-between border-b border-white/10 p-6 font-mono text-xs uppercase tracking-widest"><span className="text-muted">Formation status</span><strong className={isComplete ? 'text-success' : 'text-accent'}>{filledCount} / 3 ACTIVE</strong></div>
+              <div className="absolute bottom-12 left-[3.05rem] top-28 w-px bg-gradient-to-b from-accent/60 via-accent/30 to-transparent" aria-hidden="true" />
                 {allRoles.map((role, idx) => {
                   const memberName = getRoleStatus(role);
                   const isFilled = memberName !== null;
@@ -136,30 +147,31 @@ export default function SquadPage() {
                   return (
                     <motion.div 
                       key={role} 
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
-                      className={`flex items-center gap-4 p-4 rounded-xl border ${isFilled ? 'bg-black border-white/10' : 'bg-black/50 border-dashed border-white/10'}`}
+                      className={`relative flex items-center gap-5 border-b border-white/[.07] px-6 py-7 last:border-0 ${isFilled ? 'bg-accent/[.04]' : 'bg-transparent'}`}
                     >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${isFilled ? (isComplete ? 'bg-success text-black' : 'bg-accent text-white') : 'bg-transparent border border-muted text-muted'}`}>
+                      <div className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors ${isFilled ? (isComplete ? 'bg-success text-black border-success' : 'bg-accent text-white border-accent') : 'bg-[#10141d] border-dashed border-accent/60 text-accent'}`}>
                         {isFilled ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-mono tracking-widest text-muted uppercase">{role}</p>
-                        <p className={`font-semibold truncate ${isFilled ? 'text-white text-lg' : 'text-muted italic'}`}>
-                          {isFilled ? memberName : `OPEN SLOT: ${role}`}
+                        <p className="text-[10px] font-mono tracking-widest text-accent uppercase">0{idx + 1} / {role}</p>
+                        <p className={`font-semibold truncate ${isFilled ? 'text-white text-xl' : 'text-zinc-300 text-xl'}`}>
+                          {isFilled ? memberName : 'Your next teammate'}
                         </p>
+                        {!isFilled && <p className="mt-1 text-xs text-muted">An open role in this build</p>}
                       </div>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{isFilled ? 'READY' : 'OPEN'}</span>
                     </motion.div>
                   )
                 })}
-              </AnimatePresence>
 
               {isComplete && (
                 <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="mt-4 p-4 rounded-xl bg-success/20 border border-success/30 text-center"
+                  className="m-5 rounded-xl border border-success/30 bg-success/15 p-4 text-center"
                 >
                   <p className="font-mono tracking-widest text-success font-bold uppercase text-sm">
                     Ready for Workshop
@@ -171,12 +183,12 @@ export default function SquadPage() {
 
           {/* Viral Action */}
           <div className="flex flex-col gap-4">
-            <h3 className="font-mono text-xs tracking-widest text-muted uppercase mb-2">Recruitment Protocol</h3>
+            <h3 className="font-mono text-xs tracking-widest text-muted uppercase mb-2">The invitation</h3>
             
             <div className="glass-panel rounded-2xl p-8 relative overflow-hidden flex-1 flex flex-col justify-center">
               {isComplete ? (
                 <motion.div 
-                  initial={{ opacity: 0 }}
+                  initial={reduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-center"
                 >
@@ -197,15 +209,16 @@ export default function SquadPage() {
                 </motion.div>
               ) : (
                 <motion.div 
-                  initial={{ opacity: 0 }}
+                  initial={reduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="flex flex-col h-full"
                 >
                   <div className="mb-8">
-                    <h3 className="text-2xl font-bold mb-3">Recruit Your Team</h3>
+                    <h3 className="text-2xl font-bold mb-3">The build needs your people.</h3>
                     <p className="text-muted leading-relaxed">
-                      You cannot ship the project alone. Share this classified link to recruit a <span className="text-white font-medium">{missingRoles.join(' and a ')}</span> from your campus.
+                      You have the <span className="text-white font-medium">{projectResult?.squadRole}</span> role. Invite a <span className="text-white font-medium">{missingRoles.join(' and a ')}</span> to discover their own Project DNA and join this squad.
                     </p>
+                    <div className="mt-7 rounded-xl border border-accent/20 bg-accent/[.06] p-4"><p className="eyebrow mb-2">THEY WILL SEE</p><p className="text-sm text-zinc-200">An invitation to build <strong>{projectResult?.project?.name}</strong> with your squad.</p></div>
                   </div>
                   
                   <div className="space-y-4 mt-auto">
@@ -215,6 +228,7 @@ export default function SquadPage() {
                       className="w-full bg-[#25D366] text-black hover:bg-[#20bd5a] border-none"
                     >
                       SHARE ON WHATSAPP
+                      <ArrowRight size={17} className="ml-2" />
                     </Button>
                     
                     <div className="grid grid-cols-2 gap-4">
@@ -235,6 +249,7 @@ export default function SquadPage() {
                         {copied ? 'COPIED!' : 'COPY LINK'}
                       </Button>
                     </div>
+                    {copyError && <p role="alert" className="text-xs text-warning">Couldn’t copy the link. Try sharing through WhatsApp or your device.</p>}
                   </div>
                 </motion.div>
               )}
