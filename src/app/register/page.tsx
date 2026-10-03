@@ -40,9 +40,9 @@ export default function RegisterPage() {
         projectResult
       );
       
-      completeRegistration(userId, builderNumber);
-      trackEvent('registration_completed', { builderNumber });
-      
+      let finalSquadCode = null;
+      let finalSquadId = null;
+
       // 2. Create or Join Squad
       if (!referralContext.squadCode) {
         // Create
@@ -51,6 +51,8 @@ export default function RegisterPage() {
           projectResult?.project?.name || 'AI Project',
           projectResult?.squadRole || 'BUILDER'
         );
+        finalSquadCode = squad.code;
+        finalSquadId = squad.id;
         setCurrentSquad(squad.id, squad.code);
         trackEvent('squad_created', { squadCode: squad.code });
       } else {
@@ -60,12 +62,23 @@ export default function RegisterPage() {
           userId, 
           projectResult?.squadRole || 'BUILDER'
         );
-        setCurrentSquad(referralContext.squadCode, referralContext.squadCode); // the API returns ID?
-        trackEvent('squad_joined', { squadCode: referralContext.squadCode, role: joinResult.assignedRole });
+        
         if (joinResult.error) {
-          alert(joinResult.error); // E.g., 'Squad Full' handled elegantly later, simple alert for now
+          // Join failed (e.g. squad full). Route to diagnostic to "start my own squad".
+          alert(`Could not join squad: ${joinResult.error}. Redirecting to start your own.`);
+          router.push('/diagnostic');
+          return;
+        } else {
+          finalSquadCode = referralContext.squadCode;
+          finalSquadId = joinResult.squad?.id || referralContext.squadCode;
+          setCurrentSquad(finalSquadId, finalSquadCode);
+          trackEvent('squad_joined', { squadCode: finalSquadCode, role: joinResult.assignedRole });
         }
       }
+
+      // 3. Complete Registration locally ONLY after successful squad operation
+      completeRegistration(userId, builderNumber);
+      trackEvent('registration_completed', { builderNumber });
 
       // Simulate a small delay for dramatic effect
       setTimeout(() => {

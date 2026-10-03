@@ -19,7 +19,7 @@ export const registerUser = async (data: any, referralContext: any, projectResul
   } catch (e) {
     console.error('Registration fetch failed, falling back', e);
     const userId = uuidv4();
-    return { userId, builderNumber: 328 + Math.floor(Math.random() * 1000) };
+    return { userId, builderNumber: 328 + Math.floor(Math.random() * (499 - 328)) };
   }
 };
 
@@ -46,10 +46,16 @@ export const joinSquad = async (code: string, userId: string, naturalRole: strin
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, naturalRole })
     });
-    if (!res.ok) throw new Error('Failed to join squad');
-    return await res.json();
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      return { error: data.error || 'Failed to join squad', success: false };
+    }
+    
+    return data;
   } catch (e) {
     console.error('Join squad fetch failed, falling back', e);
-    return { assignedRole: naturalRole, success: false };
+    return { error: 'Network error', assignedRole: naturalRole, success: false };
   }
 };

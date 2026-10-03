@@ -14,28 +14,30 @@ export const getSessionId = () => {
 export const trackEvent = async (eventName: string, metadata: any = {}) => {
   console.log(`[Event Tracked]: ${eventName}`, metadata);
   
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const sessionId = getSessionId();
-      
-      // Filter out PII
-      const safeMetadata = { ...metadata };
-      delete safeMetadata.name;
-      delete safeMetadata.email;
-      delete safeMetadata.phone;
+  try {
+    const sessionId = getSessionId();
+    
+    // Filter out PII
+    const safeMetadata = { ...metadata };
+    delete safeMetadata.name;
+    delete safeMetadata.email;
+    delete safeMetadata.phone;
 
-      await supabase.from('events').insert({
-        anonymous_id: sessionId,
-        event_name: eventName,
+    fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName,
+        anonymousId: sessionId,
         source: safeMetadata.source || null,
-        squad_id: safeMetadata.squadId || null,
+        squadId: safeMetadata.squadId || null,
         campus: safeMetadata.campus || null,
-        user_id: safeMetadata.userId || null,
-        referrer_user_id: safeMetadata.referrerId || null,
+        userId: safeMetadata.userId || null,
+        referrerId: safeMetadata.referrerId || null,
         metadata: safeMetadata
-      });
-    } catch (e) {
-      console.error('Failed to track event to Supabase', e);
-    }
+      })
+    }).catch(e => console.error('Failed to track event to API', e));
+  } catch (e) {
+    console.error('Error tracking event', e);
   }
 };

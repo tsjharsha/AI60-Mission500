@@ -40,7 +40,16 @@ export default function SquadPage() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   const shareUrl = `${appUrl}/join/${currentSquad.code}?source=whatsapp&ref=${registration.userId}`;
-  const shareText = `I got assigned ${projectResult?.squadRole} in NxtWave AI60. We're building ${projectResult?.project?.name} and still need a Solver + Shipper. Discover your Project DNA and join my squad: ${shareUrl}`;
+  
+  const allRoles = ['BUILDER', 'SOLVER', 'SHIPPER'];
+  const occupiedRoles = squadMembers.map(m => m.role);
+  const missingRoles = allRoles.filter(r => !occupiedRoles.includes(r));
+  
+  let neededText = missingRoles.length > 0 
+    ? `and still need a ${missingRoles.join(' + ')}.` 
+    : `and our squad is complete!`;
+    
+  const shareText = `I got assigned ${projectResult?.squadRole} in NxtWave AI60. We're building ${projectResult?.project?.name} ${neededText} Discover your Project DNA and join my squad: ${shareUrl}`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -132,7 +141,7 @@ export default function SquadPage() {
             
             <h3 className="text-2xl font-bold mb-4 relative z-10">Complete Your Squad</h3>
             <p className="text-zinc-400 mb-8 relative z-10">
-              You cannot ship the project alone. Recruit a Solver and a Shipper from your campus.
+              You cannot ship the project alone. Recruit {missingRoles.length > 0 ? `a ${missingRoles.join(' and a ')}` : 'new members'} from your campus.
             </p>
             
             <div className="space-y-3 relative z-10">

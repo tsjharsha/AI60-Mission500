@@ -8,18 +8,55 @@ export async function POST(req: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       // Deterministic rules fallback
+      
+      const { 
+        registrationConversion, 
+        inviteConversion, 
+        kFactor, 
+        campusDistribution = {},
+        sourceDistribution = {}
+      } = metrics;
+      
+      const topCampus = Object.entries(campusDistribution).sort((a: any, b: any) => b[1] - a[1])[0];
+      const topSource = Object.entries(sourceDistribution).sort((a: any, b: any) => b[1] - a[1])[0];
+
+      const observations = [];
+      if (inviteConversion > registrationConversion) {
+        observations.push(`Squad invitations are converting ${(inviteConversion / Math.max(registrationConversion, 1)).toFixed(1)}x better than generic traffic.`);
+      } else {
+        observations.push(`Generic traffic is currently converting better than squad invitations.`);
+      }
+      
+      if (topCampus) {
+        observations.push(`${topCampus[0]} is the leading campus with ${topCampus[1]} registrations.`);
+      } else {
+        observations.push(`Not enough campus data yet to determine a leading segment.`);
+      }
+
+      if (kFactor > 1) {
+        observations.push(`Viral coefficient is healthy at ${kFactor.toFixed(2)}, indicating strong organic growth.`);
+      } else if (kFactor > 0) {
+        observations.push(`Viral coefficient is low at ${kFactor.toFixed(2)}. We need to incentivize sharing more.`);
+      } else {
+        observations.push(`Awaiting more referral data to calculate K-Factor.`);
+      }
+
+      const bottleneck = inviteConversion < 10 && kFactor < 0.5 
+        ? "Low squad invite conversion suggests the invite page lacks urgency."
+        : "Registration conversion from generic traffic remains the primary leak.";
+
       return NextResponse.json({
         type: 'AUTOMATED GROWTH ANALYSIS',
-        observations: [
-          "Squad invitations are converting 2.1× better than generic share links.",
-          "ECE students complete Project DNA at a high rate but register less frequently.",
-          "Students recommended Developer Tool projects have the highest workshop conversion."
-        ],
-        bottleneck: "Registration completion rate for non-CS branches.",
+        observations,
+        bottleneck,
         recommendedExperiment: {
-          hypothesis: "Tailoring the final call-to-action to mention branch-specific hiring companies will increase registration.",
-          action: "Test a placement-focused CTA for ECE/Mech traffic.",
-          successMetric: "Registration Conversion Rate"
+          hypothesis: inviteConversion < 10 
+            ? "Adding a countdown timer to the squad invite page will create urgency and improve conversion."
+            : "Simplifying the main registration form will increase completion rate for generic traffic.",
+          action: inviteConversion < 10 
+            ? "Test a countdown timer on the invite page."
+            : "Test a 1-click WhatsApp registration flow.",
+          successMetric: inviteConversion < 10 ? "Invite Conversion Rate" : "Registration Conversion Rate"
         }
       });
     }

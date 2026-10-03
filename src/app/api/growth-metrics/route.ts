@@ -61,6 +61,22 @@ export async function GET() {
     const averageInvitesPerRegistrant = registrationCount > 0 ? (invitesShared / registrationCount) : 0;
     const kFactor = registrationCount > 0 && inviteOpens > 0 ? (averageInvitesPerRegistrant * (inviteRegistrations / inviteOpens)) : 0;
 
+    // Distributions
+    const { data: users } = await supabaseServer.from('users').select('college, archetype');
+    const campusDistribution = (users || []).reduce((acc: any, u) => {
+      if (u.college) acc[u.college] = (acc[u.college] || 0) + 1;
+      return acc;
+    }, {});
+    const archetypeDistribution = (users || []).reduce((acc: any, u) => {
+      if (u.archetype) acc[u.archetype] = (acc[u.archetype] || 0) + 1;
+      return acc;
+    }, {});
+    const sourceDistribution = (registrations || []).reduce((acc: any, r) => {
+      const source = r.source || 'direct';
+      acc[source] = (acc[source] || 0) + 1;
+      return acc;
+    }, {});
+
     const mode = registrationCount > 50 ? 'LIVE' : 'HYBRID';
 
     // Merging seeded data to keep demo looking good if it's Hybrid
@@ -68,8 +84,22 @@ export async function GET() {
     const seededDiag = 2890;
     const seededComp = 2450;
     const seededReg = 328;
+    
+    // Seeded distributions for demo
+    const seededCampus: Record<string, number> = { 'VIT Vellore': 142, 'SRM Chennai': 98, 'BITS Pilani': 45 };
+    const seededArchetypes: Record<string, number> = { 'The Architect': 110, 'The Optimizer': 85, 'The Visionary': 133 };
+    const seededSources: Record<string, number> = { 'direct': 48, 'whatsapp': 280 };
 
     if (mode === 'HYBRID') {
+      const hybridCampus = { ...seededCampus };
+      for (const [k, v] of Object.entries(campusDistribution)) hybridCampus[k] = (hybridCampus[k] || 0) + (v as number);
+      
+      const hybridArchetypes = { ...seededArchetypes };
+      for (const [k, v] of Object.entries(archetypeDistribution)) hybridArchetypes[k] = (hybridArchetypes[k] || 0) + (v as number);
+      
+      const hybridSources = { ...seededSources };
+      for (const [k, v] of Object.entries(sourceDistribution)) hybridSources[k] = (hybridSources[k] || 0) + (v as number);
+
       return NextResponse.json({
         mode: 'HYBRID',
         visitors: seededVisitors + uniqueVisitors,
@@ -85,9 +115,9 @@ export async function GET() {
         squadsCompleted: 112 + squadsCompleted,
         averageInvitesPerRegistrant: (1402 + invitesShared) / (seededReg + registrationCount),
         kFactor: ((1402 + invitesShared) / (seededReg + registrationCount)) * ((280 + inviteRegistrations) / (1850 + inviteOpens)),
-        campusDistribution: {},
-        archetypeDistribution: {},
-        sourceDistribution: {}
+        campusDistribution: hybridCampus,
+        archetypeDistribution: hybridArchetypes,
+        sourceDistribution: hybridSources
       });
     }
 
@@ -106,9 +136,9 @@ export async function GET() {
       squadsCompleted,
       averageInvitesPerRegistrant,
       kFactor,
-      campusDistribution: {},
-      archetypeDistribution: {},
-      sourceDistribution: {}
+      campusDistribution,
+      archetypeDistribution,
+      sourceDistribution
     });
   } catch (err) {
     console.error('API /growth-metrics: Error', err);
