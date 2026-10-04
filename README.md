@@ -1,56 +1,57 @@
-# AI60: Mission 500
+# AI60 - Mission 500
 
-**A real-world growth experiment for NxtWave's AI60.**
+A working NxtWave growth-challenge simulation: a concrete project offer, optional three-question matching, direct workshop registration, optional squads, and an editable seven-day acquisition model.
 
-## Problem
-Most students know AI is important but lack the specific verifiable proof that recruiters want. Standard workshop registration forms are boring and have high drop-off rates because the user doesn't feel the value *before* signing up.
+## Run
 
-## Growth Insight
-Do not sell the workshop first. Make the student experience a personalized placement-related insight. By showing them exactly what they are missing (Project DNA) based on their specific branch and skills, they are much more likely to register and share the experience with friends. 
-
-## Core Loop
-1. **The Hook:** A cinematic landing page promising to reveal their "hidden AI gap."
-2. **The Diagnostic:** A progressive 6-step form that captures profile data (Branch, Target Role, Skills, AI Experience) without feeling like a form.
-3. **The Reveal (Project DNA):** An AI engine generates a personalized "60-minute project" designed specifically for their role to prove their AI capability to recruiters.
-4. **The Value Moment:** The "2027 Interview Question" moment that forces them to confront their gap, leading to...
-5. **The Registration:** Capturing the remaining info (Email, Phone) to secure their "Builder Number."
-6. **The Viral Loop (Squads):** Instead of simple referrals, users must complete a 3-person "Squad" (Builder, Solver, Shipper) by sharing a dynamic invite link.
-
-## Architecture & Tech Stack
-- **Framework:** Next.js 16 (App Router)
-- **Styling:** Tailwind CSS + Framer Motion
-- **State Management:** Zustand (with local persistence)
-- **Database:** Supabase (PostgreSQL)
-- **AI Engine:** Google Gemini (with deterministic fallback)
-
-## How to Run
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Start the dev server: `npm run dev`
-
-## Required Environment Variables
-Create a `.env.local` file with the following (optional but recommended for full functionality):
-```
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-key
-NEXT_PUBLIC_GEMINI_API_KEY=your-gemini-key
+```sh
+npm ci
+npm run dev
 ```
 
-## Demo Mode Behavior
-If you run this without environment variables, the application gracefully degrades into **Demo Mode**:
-- Registration persists locally.
-- Builder Numbers are simulated.
-- Squad formation and joining work entirely locally.
-- Project DNA falls back to a weighted deterministic engine.
-This guarantees the core product flow *never* breaks during a recruiter demo due to missing APIs or network timeouts.
+For a production build:
 
-## How Project DNA Works
-The deterministic fallback uses a catalog of high-quality AI projects (e.g., "AI SQL Debugging Copilot", "AI Circuit Diagnostic Assistant"). It scores each project based on the user's branch, target role, and selected skills, picking the best fit. 
-If the Gemini API key is provided, it uses `gemini-2.5-flash` to generate a personalized project and gap analysis directly mapped to the user's input.
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build -- --webpack
+npm start
+```
 
-## How Analytics Work
-Events (landing views, diagnostic steps, registrations, squad joins) are tracked in Supabase. The Admin `/admin` dashboard displays these metrics. If the database is missing or lacks sufficient data, the dashboard clearly displays "SIMULATED" data to preserve immersion without misrepresenting facts.
+Open `/` and use the visible navigation. `/submission` contains the evaluator walkthrough, two-page plan, learning notes, captioned video, and narration script. `/dashboard` contains the campaign simulator and measurements. `/admin` also exposes demo reset.
 
-## Resetting the Demo
-To record or repeat the demo flow cleanly, visit `/admin` and click **RESET DEMO SESSION**. This clears the local Zustand store without wiping the Supabase database.
+## Explicit modes
+
+Without server database configuration, the app runs in SIMULATION mode. Registration validates the contact fields but does not retain email or phone. Demo builders and squads live in process memory and expire on restart; this mode is for a single-instance walkthrough, not production persistence. The dashboard's illustrative scenario remains fixed and is labeled separately from test activity.
+
+With the database configured, writes are LIVE and errors fail closed. No fake success and no hybrid seeded/live totals. The real workshop date and organizer contact have not been supplied. The current project is a challenge prototype, not an official NxtWave enrollment service.
+
+## Live configuration and migration
+
+Copy `.env.example` into `.env.local`. Never use NEXT_PUBLIC variables for signing keys or service-role credentials.
+
+1. On a staging Supabase project, apply `src/lib/supabase/schema.sql` if starting fresh.
+2. Run `supabase/preflight.sql`; reconcile existing duplicates deliberately. No automatic data deletion is included.
+3. Apply `supabase/migrations/20261004_integrity.sql` once. It adds unique constraints, builder sequence, transactional registration, and locked squad joins. SQL functions are callable only by service_role.
+4. Set `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and a random `SESSION_SECRET` of at least 32 characters. Keep the secret stable across instances.
+5. Verify database transactions and concurrent joins using your staging credentials. Session cookies are HttpOnly, SameSite=Lax, Secure under production.
+6. Before collecting real people, supply organizer contact, event schedule, retention/deletion procedures, and a shared edge rate limiter. The included rate limiter is per process only.
+
+Signed sessions authorize squad writes. Client-supplied user IDs are ignored. Email uniqueness prevents duplicate live registration; recovering a session from an email alone is intentionally unsupported because email verification has not been implemented.
+
+## Growth model
+
+Baseline: 20 campus contacts × 50 unique visits × 30% conversion = 300. Community visitors: 500 × 25% = 125. One referral generation: 425 × 30% participation × 2 delivered invites × 29.42% conversion ≈ 75. Total 500. These values are hypotheses, not actual results.
+
+At 20% campus conversion the forecast is 382. The simulator exposes channel overlap, reach, conversion, invitations, uncommitted budget, and conservative recovery estimates. The maximum budget allocation is INR 2,000.
+
+Unique analytics stages are counted by anonymous browser ID. Direct registration bypasses the matcher. Referral contribution is attributed registrations / other registrations; it is not viral K. Share actions do not verify invitation delivery. Database reads are paginated beyond Supabase's default row limit.
+
+## Validation
+
+Browser tests: `npx playwright install chromium`, then `npm run test:browser`. A preinstalled binary can be supplied through BROWSER_EXECUTABLE_PATH. `npm run test:failure` injects a configured database outage and verifies that it fails closed. The tests launch their own production server.
+
+`npm test` checks forecast arithmetic, bounds, overlap, deduplication, consistent metrics, and guidance for experienced students. Run `npm run test:integration` to exercise requests, validation, session authorization, duplicate joins, and concurrent capacity in simulation. These tests do not claim that the live migration has been executed.
+
+See `docs/Audit-Completion-Report.md` for the full implementation-to-audit mapping and remaining deployment gates. A captioned three-minute video and narration script are supplied. Personal narration is optional.

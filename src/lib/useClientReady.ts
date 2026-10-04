@@ -1,9 +1,13 @@
-'use client';
+"use client";
 
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from "react";
 
 const subscribe = () => () => {};
 
 export function useClientReady() {
-  return useSyncExternalStore(subscribe, () => true, () => false);
+  return useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
 }

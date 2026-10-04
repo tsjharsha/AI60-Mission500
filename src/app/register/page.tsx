@@ -1,283 +1,350 @@
-'use client';
-
-import { motion, useReducedMotion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import { useAppStore } from '@/store/useAppStore';
-import { useState, useEffect } from 'react';
-import { ShieldCheck, Mail, Phone, ArrowRight, Fingerprint } from 'lucide-react';
-import { trackEvent } from '@/lib/analytics/trackEvent';
-import { registerUser, createSquad, joinSquad } from '@/lib/supabase/services';
-import { Button } from '@/components/ui/Button';
-import { useClientReady } from '@/lib/useClientReady';
-
-export default function RegisterPage() {
-  const router = useRouter();
-  const reduceMotion = useReducedMotion();
-  const { profile, projectResult, referralContext, completeRegistration, registration, setCurrentSquad } = useAppStore();
-  
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const mounted = useClientReady();
-  const [revealPhase, setRevealPhase] = useState(0); // 0: Form, 1: Generating, 2: Reveal
-
+"use client";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight, Check, Download, Ticket } from "lucide-react";
+import { useAppStore, type ProjectResult } from "@/store/useAppStore";
+import { getProject, getProjectByName, PROJECTS } from "@/lib/projects";
+import { runDeterministicEngine } from "@/lib/project-dna/deterministicEngine";
+import {
+  registerUser,
+  request,
+  type RegistrationResponse,
+} from "@/lib/supabase/services";
+import { trackEvent } from "@/lib/analytics/trackEvent";
+function Registration() {
+  const search = useSearchParams();
+  const {
+    profile,
+    projectResult,
+    referralContext,
+    setProfile,
+    setProjectResult,
+    registration,
+    completeRegistration,
+  } = useAppStore();
+  const [verified, setVerified] = useState(false);
+  const [schedule, setSchedule] = useState<{
+    start: string | null;
+    url: string | null;
+  }>({ start: null, url: null });
+  const [ready, setReady] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const [selected, setSelected] = useState(
+    search.get("project") ||
+      (projectResult && getProjectByName(projectResult.project.name).id) ||
+      "sql",
+  );
+  const project = getProject(selected);
   useEffect(() => {
-    if (!profile || !projectResult) {
-      router.push('/diagnostic');
-    } else {
-      trackEvent('registration_started', { source: referralContext.source });
-    }
-  }, [profile, projectResult, router, referralContext.source]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !phone) return;
-    setError('');
-    setIsSubmitting(true);
-    setRevealPhase(1); // Start scanning animation
-    
+    let active = true;
+    request<
+      RegistrationResponse & {
+        registered: boolean;
+        schedule: { start: string | null; url: string | null };
+      }
+    >("/api/session")
+      .then((data) => {
+        if (active && data.schedule) setSchedule(data.schedule);
+        if (active && data.registered) {
+          completeRegistration(data.userId, data.builderNumber, data.mode);
+          setVerified(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    void trackEvent("registration_started", { source: referralContext.source });
+    return () => {
+      active = false;
+    };
+  }, [completeRegistration, referralContext.source]);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    const form = new FormData(event.currentTarget);
+    const details = {
+      ...profile,
+      name: String(form.get("name")),
+      college: String(form.get("college")),
+      graduationYear: String(form.get("year")),
+      email: String(form.get("email")),
+      phone: String(form.get("phone")),
+      targetRole: profile.targetRole || "Software Engineer",
+      skills: profile.skills || [],
+    };
+    const result: ProjectResult = runDeterministicEngine(details);
+    result.project = {
+      ...result.project,
+      name: project.name,
+      description: project.description,
+      skills: project.skills,
+    };
+    result.squadRole = project.role;
     try {
-      // 0. Preflight Squad Validation
-      if (referralContext.squadCode) {
-        try {
-          const checkRes = await fetch(`/api/squads/${referralContext.squadCode}`);
-          const squadData = await checkRes.json();
-          
-          if (!checkRes.ok || squadData.isValid === false) {
-            setError("That squad invite is no longer valid.");
-            setIsSubmitting(false);
-            setRevealPhase(0);
-            return;
-          }
-          
-          if (squadData.isFull) {
-            setError("That squad filled up while you were joining.");
-            setIsSubmitting(false);
-            setRevealPhase(0);
-            return;
-          }
-        } catch (checkErr) {
-          console.error("Squad preflight check failed", checkErr);
-          setError("Could not verify squad status due to a network error. Please try again.");
-          setIsSubmitting(false);
-          setRevealPhase(0);
-          return;
-        }
-      }
-
-      // 1. Register User
-      const { userId, builderNumber } = await registerUser(
-        { ...profile, email, phone },
-        referralContext,
-        projectResult
+      const saved = await registerUser(details, referralContext, result);
+      setProfile({
+        ...profile,
+        name: details.name,
+        college: details.college,
+        graduationYear: details.graduationYear,
+      });
+      setProjectResult(result);
+      completeRegistration(saved.userId, saved.builderNumber, saved.mode);
+      setVerified(true);
+      void trackEvent("registration_completed", {
+        source: referralContext.source,
+        variant: projectResult ? "matched" : "direct",
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Registration failed. Please retry.",
       );
-      
-      let finalSquadCode = null;
-      let finalSquadId = null;
-
-      // 2. Create or Join Squad
-      if (!referralContext.squadCode) {
-        // Create
-        const squad = await createSquad(
-          userId, 
-          projectResult?.project?.name || 'AI Project',
-          projectResult?.squadRole || 'BUILDER'
-        );
-        finalSquadCode = squad.code;
-        finalSquadId = squad.id;
-        setCurrentSquad(squad.id, squad.code);
-        trackEvent('squad_created', { squadCode: squad.code });
-      } else {
-        // Join
-        const joinResult = await joinSquad(
-          referralContext.squadCode, 
-          userId, 
-          projectResult?.squadRole || 'BUILDER'
-        );
-        
-        if (joinResult.error) {
-          setError(`Could not join squad: ${joinResult.error}.`);
-          setIsSubmitting(false);
-          setRevealPhase(0);
-          return;
-        } else {
-          finalSquadCode = referralContext.squadCode;
-          finalSquadId = joinResult.squad?.id || referralContext.squadCode;
-          setCurrentSquad(finalSquadId, finalSquadCode);
-          trackEvent('squad_joined', { squadCode: finalSquadCode, role: joinResult.assignedRole });
-        }
-      }
-
-      // 3. Complete Registration locally ONLY after successful squad operation
-      completeRegistration(userId, builderNumber);
-      trackEvent('registration_completed', { builderNumber });
-
-      // Keep the real assignment visible only after the request succeeds.
-      setTimeout(() => {
-        setRevealPhase(2);
-      }, reduceMotion ? 0 : 1100);
-      
-    } catch (err) {
-      console.error(err);
-      setError("An unexpected error occurred. Please try again.");
-      setIsSubmitting(false);
-      setRevealPhase(0);
+    } finally {
+      setBusy(false);
     }
-  };
-
-  if (!mounted || !profile || !projectResult) return null;
-
-  // Reveal Phase 2: Success
-  if ((registration.registered || revealPhase === 2) && revealPhase !== 1) {
+  }
+  function downloadChecklist() {
+    const text = `AI60 workshop preparation\nProject: ${projectResult?.project.name || project.name}\nBring a laptop, browser, and a code editor.\nOpen the starter and inspect the prepared examples.\nPlan: 10m setup, 20m build, 15m check, 15m demo.\nRecord one failure and write down its limitation.\nWorkshop date: to be announced. This is a challenge simulation.\n`;
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "AI60-preparation.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  if (!ready)
     return (
-      <div className="flex flex-col min-h-[100dvh] bg-background text-foreground items-center justify-center p-6 relative overflow-hidden">
-        {/* Deep cinematic background for reveal */}
-        <div className="absolute inset-0 z-0 bg-black" />
-        <motion.div 
-          className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-accent/30 via-black to-black opacity-0"
-          animate={{ opacity: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 1.5 }}
-        />
-        <div className="absolute inset-0 bg-grid-pattern opacity-10 z-0 pointer-events-none" />
-        
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.8, delay: reduceMotion ? 0 : 0.2, type: "spring" }}
-          className="text-center z-10 max-w-2xl w-full"
-        >
-          <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: reduceMotion ? 0 : 0.5, delay: reduceMotion ? 0 : 0.5, type: "spring" }}
-            className="w-24 h-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-8 border border-accent/40 shadow-[0_0_50px_rgba(59,130,246,0.3)] relative"
-          >
-            <div className="absolute inset-0 rounded-full border border-accent/60 animate-ping opacity-20" />
-            <ShieldCheck className="text-accent w-12 h-12" />
-          </motion.div>
-          
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-          >
-            <p className="text-accent font-mono mb-4 tracking-[0.3em] text-xs uppercase">Identity assigned / Mission 500</p>
-            <h1 className="text-5xl md:text-7xl font-bold mb-4 tracking-tighter text-white">
-              BUILDER <span className="text-accent">#{registration.builderNumber}</span>
-            </h1>
-            <p className="text-lg text-zinc-400 mb-8 font-light">Welcome to the build, {profile.name || 'builder'}.</p>
-            <div className="mx-auto mb-9 grid max-w-lg grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-left">
-              <div className="bg-[#10151d] p-5"><p className="eyebrow mb-2">YOUR PROJECT DNA</p><p className="font-semibold">{projectResult.archetype}</p></div>
-              <div className="bg-[#10151d] p-5"><p className="eyebrow mb-2">SQUAD ROLE</p><p className="font-semibold">{projectResult.squadRole}</p></div>
+      <div className="px-5 pt-32" role="status">
+        Loading workshop session…
+      </div>
+    );
+  if (verified)
+    return (
+      <div className="studio-shell px-5 pb-20 pt-32">
+        <div className="mx-auto max-w-3xl">
+          <p className="eyebrow mb-6 text-lime-200">
+            Builder reveal / workshop pass
+          </p>
+          <section className="workbench reveal-once">
+            <div className="flex items-center justify-between border-b border-dashed border-white/20 p-6">
+              <span className="flex items-center gap-3 text-xl font-semibold">
+                <Ticket className="text-lime-200" /> AI60 workshop pass
+              </span>
+              <span className="font-mono text-xs text-lime-200">
+                #{String(registration.builderNumber).padStart(3, "0")}
+              </span>
             </div>
-            <p className="mb-3 font-mono text-[11px] tracking-widest text-muted">YOUR BUILD PLAN</p>
-            <p className="mx-auto mb-9 max-w-md text-lg text-white">{projectResult.project.name}</p>
-            
-            <Button 
-              size="lg"
-              onClick={() => router.push('/squad')}
-              className="px-10 gap-3 shadow-[0_0_40px_rgba(59,130,246,0.4)]"
-            >
-              MEET MY SQUAD <ArrowRight size={20} />
-            </Button>
-          </motion.div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Phase 1: Scanning / Generating
-  if (revealPhase === 1) {
-    return (
-      <div className="flex flex-col min-h-[100dvh] bg-background text-foreground items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-5 z-0" />
-        <div className="z-10 flex flex-col items-center">
-          <motion.div 
-            animate={reduceMotion ? undefined : { rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-            className="w-20 h-20 border-t-2 border-accent border-r-2 rounded-full mb-8 opacity-80"
-          />
-          <motion.p 
-            initial={reduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="font-mono tracking-widest text-accent uppercase text-sm animate-pulse"
-          >
-            Assigning your Builder Number...
-          </motion.p>
+            <div className="p-6 sm:p-10">
+              <p className="eyebrow">
+                {registration.mode === "LIVE"
+                  ? "Saved in campaign database"
+                  : "Simulation registration only"}
+              </p>
+              <h1 className="mt-4 text-4xl sm:text-5xl">
+                {profile.name || "Builder"}, you have
+                <br />a starting point.
+              </h1>
+              <h2 className="mt-8 text-2xl text-lime-200">
+                {projectResult?.project.name || project.name}
+              </h2>
+              <p className="mt-3 text-zinc-400">
+                Free online workshop · 60 minutes ·{" "}
+                {schedule.start
+                  ? new Date(schedule.start).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                    }) + " IST"
+                  : "Schedule to be announced"}
+              </p>
+              <p className="mt-5 text-sm leading-relaxed text-zinc-400">
+                {registration.mode === "LIVE"
+                  ? "Your details are saved. The organizer still needs to confirm the schedule and send joining instructions."
+                  : "This pass demonstrates the flow. It does not enroll you in an actual NxtWave event. Demo sessions expire when the server restarts."}
+              </p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <button onClick={downloadChecklist} className="action-primary">
+                  <Download size={16} /> Preparation checklist
+                </button>
+                {schedule.start && (
+                  <a className="action-secondary" href="/api/calendar">
+                    Add confirmed date to calendar
+                  </a>
+                )}
+                <a
+                  className="action-secondary"
+                  href="/starters/AI60-starter-kit.zip"
+                  download
+                >
+                  Download starter kit
+                </a>
+              </div>
+              <Link
+                href="/squad"
+                className="text-link mt-6 inline-flex items-center gap-2"
+              >
+                Build with a friend (optional) <ArrowRight size={16} />
+              </Link>
+              <p className="mt-5 flex items-center gap-2 text-xs text-zinc-500">
+                <Check size={14} /> Your registration does not depend on forming
+                a squad.
+              </p>
+            </div>
+          </section>
         </div>
       </div>
     );
-  }
-
-  // Phase 0: Form
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-background text-foreground p-6 items-center justify-center relative overflow-hidden">
-      
-      {/* Background elements */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-ai/5 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
-
-      <motion.div 
-        initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full relative z-10"
-      >
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-muted-bg/50 border border-border mb-6">
-            <Fingerprint className="text-accent w-6 h-6" />
+    <div className="studio-shell px-5 pb-20 pt-32">
+      <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-2">
+        <div>
+          <p className="eyebrow mb-5 text-lime-200">
+            Free workshop / direct registration
+          </p>
+          <h1 className="text-5xl leading-tight sm:text-6xl">
+            One hour.
+            <br />
+            <span className="font-serif italic text-lime-200">
+              Something to show.
+            </span>
+          </h1>
+          <p className="mt-6 text-zinc-400">
+            Save your place in the workshop concept. Choose a project now;
+            matching and teamwork are optional.
+          </p>
+          <div className="mt-8 panel">
+            <p className="eyebrow mb-4">What you leave with</p>
+            <ul className="space-y-4 text-sm text-zinc-300">
+              {[
+                "A guided project prototype",
+                "Three checked examples and one documented failure",
+                "A README and an honest demo explanation",
+              ].map((item) => (
+                <li key={item} className="flex gap-3">
+                  <Check size={16} className="shrink-0 text-lime-200" />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
-          <h1 className="text-4xl font-bold mb-3 tracking-tight">Claim your Builder Number</h1>
-          <p className="text-muted leading-relaxed">
-            Join the 60-minute build with {projectResult.project.name}. Your squad comes next.
+          <p className="mt-5 text-xs leading-relaxed text-zinc-500">
+            Challenge simulation. No event date has been confirmed. Use
+            fictional contact details while testing.
           </p>
         </div>
-        
-        {error && (
-          <div className="mb-6 p-4 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm text-center">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted w-5 h-5 group-focus-within:text-white transition-colors" />
-            <input 
-              type="email" 
-              placeholder="Primary Email Address" 
+        <form onSubmit={submit} className="panel space-y-5">
+          <label className="block text-sm">
+            Name
+            <input
+              className="form-field mt-2"
+              name="name"
+              autoComplete="name"
               required
-              value={email}
-              onChange={e => { setError(''); setEmail(e.target.value); }}
-              className="w-full bg-muted-bg/50 border border-border rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors placeholder:text-muted/50 text-white"
+              maxLength={80}
+              defaultValue={profile.name}
             />
-          </div>
-          
-          <div className="relative group">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-muted w-5 h-5 group-focus-within:text-white transition-colors" />
-            <input 
-              type="tel" 
-              placeholder="WhatsApp Number" 
+          </label>
+          <label className="block text-sm">
+            College
+            <input
+              className="form-field mt-2"
+              name="college"
               required
-              value={phone}
-              onChange={e => { setError(''); setPhone(e.target.value); }}
-              className="w-full bg-muted-bg/50 border border-border rounded-xl py-4 pl-12 pr-4 outline-none focus:border-white transition-colors placeholder:text-muted/50 text-white"
+              maxLength={120}
+              defaultValue={profile.college}
             />
+          </label>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="block text-sm">
+              Graduation year
+              <input
+                className="form-field mt-2"
+                name="year"
+                required
+                inputMode="numeric"
+                pattern="20[0-9]{2}"
+                maxLength={4}
+                defaultValue={profile.graduationYear || "2027"}
+              />
+            </label>
+            <label className="block text-sm">
+              Project
+              <select
+                className="form-field mt-2"
+                value={selected}
+                onChange={(e) => setSelected(e.target.value)}
+              >
+                {PROJECTS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          
-          <Button 
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-6 mt-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] gap-2 group"
-          >
-            <Fingerprint className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" />
-            CLAIM MY BUILDER NUMBER
-          </Button>
-
-          <p className="text-center text-[10px] font-mono text-muted/60 mt-4 uppercase tracking-wider">
-            Your details are used for workshop registration.
-          </p>
+          <label className="block text-sm">
+            Email
+            <input
+              className="form-field mt-2"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              maxLength={254}
+            />
+          </label>
+          <label className="block text-sm">
+            WhatsApp number <span className="text-zinc-500">(optional)</span>
+            <input
+              className="form-field mt-2"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              maxLength={25}
+            />
+          </label>
+          <label className="flex items-start gap-3 text-xs leading-relaxed text-zinc-400">
+            <input
+              className="mt-1 accent-lime-200"
+              name="consent"
+              type="checkbox"
+              required
+            />
+            I agree to use these details for this workshop registration. No
+            unrelated marketing.{" "}
+            <Link href="/privacy" className="text-link">
+              Privacy details
+            </Link>
+          </label>
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg border border-red-300/20 p-3 text-sm text-red-300"
+            >
+              {error}
+            </p>
+          )}
+          <button className="action-primary w-full" disabled={busy}>
+            {busy ? "Saving registration…" : "Register for the workshop"}
+            <ArrowRight size={17} />
+          </button>
         </form>
-      </motion.div>
+      </div>
     </div>
+  );
+}
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="pt-32" role="status">
+          Loading registration…
+        </div>
+      }
+    >
+      <Registration />
+    </Suspense>
   );
 }

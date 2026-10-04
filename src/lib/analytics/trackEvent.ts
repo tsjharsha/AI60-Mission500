@@ -1,42 +1,48 @@
-import { v4 as uuidv4 } from 'uuid';
-
-export const getSessionId = () => {
-  if (typeof window === 'undefined') return '';
-  let sid = localStorage.getItem('ai60_session_id');
-  if (!sid) {
-    sid = uuidv4();
-    localStorage.setItem('ai60_session_id', sid);
-  }
-  return sid;
-};
-
-export const trackEvent = async (eventName: string, metadata: any = {}) => {
-  console.log(`[Event Tracked]: ${eventName}`, metadata);
-  
+export function getSessionId() {
   try {
-    const sessionId = getSessionId();
-    
-    // Filter out PII
-    const safeMetadata = { ...metadata };
-    delete safeMetadata.name;
-    delete safeMetadata.email;
-    delete safeMetadata.phone;
-
-    fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    let id = localStorage.getItem("ai60_session_id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("ai60_session_id", id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+const allowed = [
+  "source",
+  "squadCode",
+  "step",
+  "projectName",
+  "archetype",
+  "variant",
+  "referrerId",
+];
+export async function trackEvent(
+  eventName: string,
+  metadata: Record<string, unknown> = {},
+) {
+  const safe = Object.fromEntries(
+    Object.entries(metadata).filter(
+      ([key, value]) =>
+        allowed.includes(key) &&
+        (typeof value === "string" || typeof value === "number"),
+    ),
+  );
+  try {
+    await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
       body: JSON.stringify({
         eventName,
-        anonymousId: sessionId,
-        source: safeMetadata.source || null,
-        squadId: safeMetadata.squadId || null,
-        campus: safeMetadata.campus || null,
-        userId: safeMetadata.userId || null,
-        referrerId: safeMetadata.referrerId || null,
-        metadata: safeMetadata
-      })
-    }).catch(e => console.error('Failed to track event to API', e));
-  } catch (e) {
-    console.error('Error tracking event', e);
+        anonymousId: getSessionId(),
+        source: safe.source || null,
+        metadata: safe,
+      }),
+    });
+  } catch {
+    /* Analytics must not prevent registration. */
   }
-};
+}

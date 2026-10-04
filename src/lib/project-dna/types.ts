@@ -8,9 +8,9 @@ export interface ProjectCatalogEntry {
   roles: string[];
   requiredSkills: string[];
   optionalSkills: string[];
-  squadRole: 'BUILDER' | 'SOLVER' | 'SHIPPER';
+  squadRole: "BUILDER" | "SOLVER" | "SHIPPER";
   estimatedMinutes: number;
-  difficulty: 'Beginner-friendly' | 'Intermediate' | 'Advanced';
+  difficulty: "Beginner-friendly" | "Intermediate" | "Advanced";
 }
 
 export interface DNAResult {

@@ -1,29 +1,66 @@
-import { NextResponse } from 'next/server';
-import { supabaseServer, isSupabaseServerConfigured } from '@/lib/supabase/server';
-
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase/server";
+import {
+  fail,
+  field,
+  HttpError,
+  limit,
+  readBody,
+  record,
+} from "@/lib/server/http";
+const names = new Set([
+  "landing_view",
+  "diagnostic_started",
+  "diagnostic_step_completed",
+  "diagnostic_completed",
+  "project_generated",
+  "result_viewed",
+  "registration_started",
+  "registration_completed",
+  "squad_created",
+  "squad_joined",
+  "squad_invite_shared",
+  "squad_invite_opened",
+  "dashboard_viewed",
+  "cta_secure_spot_clicked",
+]);
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { eventName, anonymousId, source, squadId, campus, userId, referrerId, metadata } = body;
-
-    if (!isSupabaseServerConfigured || !supabaseServer) {
-      return NextResponse.json({ success: true, mode: 'fallback' });
+    limit(req, "events", 120);
+    const body = await readBody(req);
+    const eventName = field(body.eventName, "event", 60);
+    if (!names.has(eventName)) throw new HttpError("Unknown event.");
+    const anonymousId = field(body.anonymousId, "anonymous ID", 80);
+    const source = field(body.source, "source", 60, false);
+    const metadata = record(body.metadata);
+    const safe = Object.fromEntries(
+      Object.entries(metadata).filter(
+        ([key, value]) =>
+          [
+            "source",
+            "squadCode",
+            "step",
+            "projectName",
+            "archetype",
+            "variant",
+          ].includes(key) &&
+          (typeof value === "string" || typeof value === "number"),
+      ),
+    );
+    if (supabaseServer) {
+      const { error } = await supabaseServer.from("events").insert({
+        anonymous_id: anonymousId,
+        event_name: eventName,
+        source: source || null,
+        metadata: safe,
+      });
+      if (error) throw new Error("Analytics insert failed.");
     }
-
-    await supabaseServer.from('events').insert({
-      anonymous_id: anonymousId,
-      event_name: eventName,
-      source: source || null,
-      squad_id: squadId || null,
-      campus: campus || null,
-      user_id: userId || null,
-      referrer_user_id: referrerId || null,
-      metadata: metadata || {}
+    return NextResponse.json({
+      success: true,
+      mode: supabaseServer ? "LIVE" : "SIMULATION",
     });
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error('API /events: Error', err);
-    return NextResponse.json({ error: 'Internal server error', success: false }, { status: 500 });
+  } catch (error) {
+    return fail(error);
   }
 }

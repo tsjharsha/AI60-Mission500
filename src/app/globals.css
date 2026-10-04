@@ -1,121 +1,186 @@
 @import "tailwindcss";
-
 @theme {
-  --color-background: #080808;
-  --color-foreground: #FAFAFA;
-  --color-muted: #8A8A93;
-  --color-muted-bg: #111113;
-  --color-border: #1A1A1D;
-  --color-accent: #3B82F6;
-  --color-accent-glow: rgba(59, 130, 246, 0.5);
-  
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-ai: #8B5CF6;
-  
-  --font-sans: var(--font-outfit), Arial, Helvetica, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), monospace;
+  --color-background: #111310;
+  --color-foreground: #f2f3ec;
+  --color-muted: #a0a59a;
+  --color-muted-bg: #1a1d17;
+  --color-border: #34392d;
+  --color-accent: #d4ed9c;
+  --color-success: #bfe38b;
+  --color-warning: #f1c777;
+  --color-danger: #f89b91;
+  --color-ai: #d4ed9c;
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "Courier New", monospace;
 }
-
+html {
+  scroll-behavior: smooth;
+}
 body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans);
-  overflow-x: hidden;
+  background: #111310;
+  color: #f2f3ec;
+  font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-
-/* Base text hierarchy */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4 {
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.035em;
 }
-
-.font-mono {
-  letter-spacing: -0.01em;
+button,
+summary,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
 }
-
-/* Custom utilities for cinematic feel */
-.glass-panel {
-  background: rgba(17, 17, 19, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--color-border);
+button,
+summary {
+  cursor: pointer;
 }
-
-.text-gradient {
-  background: linear-gradient(180deg, #FFFFFF 0%, #8A8A93 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+:focus-visible {
+  outline: 2px solid #d4ed9c;
+  outline-offset: 4px;
 }
-
-.text-gradient-accent {
-  background: linear-gradient(180deg, #60A5FA 0%, #3B82F6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+::selection {
+  background: #d4ed9c;
+  color: #111310;
 }
-
-/* Glow effects */
-.glow-effect {
-  position: relative;
-}
-
-.glow-effect::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-.bg-grid-pattern {
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
+.studio-shell,
 .mission-surface {
-  position: relative;
-  overflow: hidden;
-  background: radial-gradient(ellipse 60% 45% at 78% 8%, rgba(40, 84, 162, .15), transparent 80%),
-    radial-gradient(ellipse 45% 40% at 0% 70%, rgba(23, 54, 106, .12), transparent 80%),
-    #080a0e;
+  background:
+    radial-gradient(ellipse at 90% 0, #26311b 0, transparent 42%), #111310;
 }
-
-.mission-surface::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(rgba(147, 181, 240, .035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(147, 181, 240, .035) 1px, transparent 1px);
-  background-size: 52px 52px;
-  mask-image: linear-gradient(to bottom, black, transparent 85%);
-}
-
 .eyebrow {
-  font-family: var(--font-mono);
-  font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: .18em;
-  line-height: 1.5;
+  font-family: "Courier New", monospace;
+  font-size: 0.65rem;
+  line-height: 1.6;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8ea5c7;
+  color: #a0a59a;
 }
-
+.panel {
+  border: 1px solid #ffffff1c;
+  border-radius: 16px;
+  background: #ffffff03;
+  padding: 24px;
+}
+.workbench {
+  border: 1px solid #ffffff24;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #1b2019;
+  box-shadow: 0 20px 70px #00000026;
+}
+.action-primary,
+.action-secondary {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.action-primary {
+  background: #d4ed9c;
+  color: #111310;
+  border: 1px solid #d4ed9c;
+}
+.action-primary:hover {
+  background: #e2f6b5;
+}
+.action-secondary {
+  background: transparent;
+  color: #f2f3ec;
+  border: 1px solid #ffffff30;
+}
+.action-secondary:hover {
+  background: #ffffff08;
+}
+.action-primary:disabled,
+.action-secondary:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.text-link {
+  color: #d4ed9c;
+  font-size: 0.85rem;
+}
+.text-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.form-field {
+  display: block;
+  width: 100%;
+  border: 1px solid #ffffff26;
+  background: #111310;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #f2f3ec;
+  font-size: 1rem;
+}
+.form-field:focus {
+  border-color: #d4ed9c;
+}
+.form-field::placeholder {
+  color: #757e6e;
+}
+.text-gradient-accent {
+  color: #d4ed9c;
+}
+.glass-panel {
+  border: 1px solid #ffffff20;
+  background: #1a1d17;
+}
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  z-index: 100;
+  padding: 12px;
+  background: #d4ed9c;
+  color: black;
+}
+.skip-link:focus {
+  top: 12px;
+}
+.reveal-once {
+  animation: reveal 0.35s ease-out both;
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media print {
+  header,
+  footer,
+  button {
+    display: none !important;
+  }
+  body {
+    background: white;
+    color: black;
   }
 }
